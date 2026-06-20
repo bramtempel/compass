@@ -333,7 +333,7 @@ async function getAccessToken(forcePrompt = false) {
   return new Promise((res, rej) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
       callback: r => {
         if (r.error) return rej(new Error(r.error));
         _accessToken = r.access_token;
