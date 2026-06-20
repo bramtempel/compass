@@ -111,6 +111,7 @@ input:focus, textarea:focus { border-color: var(--accent); }
   font-size: .68rem; padding: 2px 8px; border-radius: 20px;
   background: var(--s3); color: var(--muted); flex-shrink: 0;
 }
+.folder-badge.local { background: #2a1f5e; color: var(--accent); }
 .relation-label {
   font-size: .72rem; color: var(--accent); font-style: italic;
 }
@@ -244,6 +245,7 @@ input:focus, textarea:focus { border-color: var(--accent); }
       <button class="btn" id="s-save-btn">Save &amp; Close</button>
       <button class="btn secondary" id="s-resync-btn">Re-sync from Drive</button>
     </div>
+    <button class="btn secondary" id="s-clear-captures-btn">Clear local captures (<span id="s-capture-count">0</span>)</button>
     <button class="btn secondary" id="s-clear-btn" style="background:#3a1a1a;color:var(--err)">Clear all data</button>
     <p id="s-status" style="font-size:.8rem;color:var(--muted)"></p>
   </div>
@@ -470,17 +472,25 @@ async function embedText(text) {
 }
 
 // ── Cosine search (dot product of normalized vecs) ────────────────────────────
-function search(query, vectors, notes, k = 8) {
+// Scores the canonical index AND any local captures, merged into one ranking.
+function search(query, k = 8) {
+  const notes = appIndex.notes;
   const N = notes.length;
   const scores = [];
   for (let i = 0; i < N; i++) {
     let dot = 0;
     const off = i * DIM;
-    for (let j = 0; j < DIM; j++) dot += query[j] * vectors[off + j];
-    scores.push({ idx: i, score: dot });
+    for (let j = 0; j < DIM; j++) dot += query[j] * appVectors[off + j];
+    scores.push({ note: notes[i], score: dot });
+  }
+  for (const cap of localCaptures) {
+    let dot = 0;
+    const v = cap.vector;
+    for (let j = 0; j < DIM; j++) dot += query[j] * v[j];
+    scores.push({ note: captureToNote(cap), score: dot });
   }
   scores.sort((a, b) => b.score - a.score);
-  return scores.slice(0, k).map(s => ({ ...notes[s.idx], score: s.score }));
+  return scores.slice(0, k).map(s => ({ ...s.note, score: s.score }));
 }
 
 // ── Anthropic suggestion + relationship labels ────────────────────────────────
@@ -552,6 +562,53 @@ function buildSuggestionsMap(data) {
   return map;
 }
 
+// ── Local captures (optimistic append) ────────────────────────────────────────
+// Captures you make on this device join the search immediately, before the laptop
+// has folded them into the canonical index. Persisted in IndexedDB.
+// Each entry: { ts, text, title, body, vec:number[] }. In memory we add a Float32Array.
+let localCaptures = []; // [{ ts, text, title, body, vector:Float32Array }]
+
+async function loadLocalCaptures() {
+  const stored = (await idbGet('local_captures')) || [];
+  localCaptures = stored.map(c => ({ ...c, vector: Float32Array.from(c.vec) }));
+}
+
+async function persistLocalCaptures() {
+  // strip the Float32Array; keep a plain number[] for clean structured-clone storage
+  const serializable = localCaptures.map(({ ts, text, title, body, vec }) => ({ ts, text, title, body, vec }));
+  await idbSet('local_captures', serializable);
+}
+
+async function addLocalCapture(text, vector) {
+  const trimmed = text.trim();
+  if (trimmed.length < 15) return;                       // skip throwaway searches
+  if (localCaptures.some(c => c.text.trim() === trimmed)) return; // dedup re-searches
+  const title = trimmed.split('\n')[0].slice(0, 80);
+  const cap = {
+    ts: Date.now(),
+    text: trimmed,
+    title,
+    body: trimmed.slice(0, 2000),
+    vec: Array.from(vector),
+    vector,
+  };
+  localCaptures.push(cap);
+  await persistLocalCaptures();
+}
+
+function captureToNote(cap) {
+  return {
+    id: 'local-' + cap.ts,
+    path: 'local capture',
+    title: cap.title,
+    body: cap.body,
+    cluster_id: null,
+    cluster_label: '',
+    vector: cap.vector,
+    _local: true,
+  };
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
@@ -572,6 +629,13 @@ function setHeaderStatus(text, ok) {
   const el = $('header-status');
   el.textContent = text;
   el.style.color = ok ? 'var(--ok)' : 'var(--muted)';
+}
+
+function updateHeaderCount() {
+  if (!appIndex) return;
+  const base = appIndex.notes.length;
+  const extra = localCaptures.length;
+  setHeaderStatus(extra ? `${base} + ${extra} notes` : `${base} notes`, true);
 }
 
 function renderResults(results, noteText) {
@@ -602,6 +666,9 @@ function renderResults(results, noteText) {
     const snippet = (r.body || '').slice(0, 280).trim();
     const score = (r.score * 100).toFixed(0);
     const folder = folderFromPath(r.path || '');
+    const badge = r._local
+      ? `<span class="folder-badge local">✦ your capture</span>`
+      : (folder ? `<span class="folder-badge">${esc(folder)}</span>` : '');
     card.innerHTML = `
       <div class="result-header">
         <span class="result-title">${esc(r.title)}</span>
@@ -609,7 +676,7 @@ function renderResults(results, noteText) {
       </div>
       ${snippet ? `<div class="result-snippet">${esc(snippet)}</div>` : ''}
       <div class="result-footer">
-        ${folder ? `<span class="folder-badge">${esc(folder)}</span>` : ''}
+        ${badge}
         <span class="relation-label" data-relation></span>
       </div>
     `;
@@ -662,6 +729,7 @@ function openSettings() {
   $('s-suggestions-id').value = cfg(K.SUGGESTIONS_ID) || '1MhHN8EVdBVSNubVbcBJURjya-1ddxh7d';
   $('s-inbox-id').value       = cfg(K.INBOX_ID);
   $('s-api-key').value        = cfg(K.API_KEY);
+  $('s-capture-count').textContent = localCaptures.length;
   $('s-status').textContent = '';
   $('settings-overlay').classList.add('open');
 }
@@ -691,15 +759,25 @@ $('s-resync-btn').onclick = async () => {
     appIndex = indexData; appVectors = vectors;
     appSuggestions = buildSuggestionsMap(suggestionsData);
     $('s-status').textContent = `Synced — ${indexData.notes.length} notes`;
-    setHeaderStatus(`${indexData.notes.length} notes`, true);
+    updateHeaderCount();
   } catch (e) {
     $('s-status').textContent = 'Error: ' + e.message;
   }
 };
 
+$('s-clear-captures-btn').onclick = async () => {
+  if (!localCaptures.length) return;
+  if (!confirm(`Clear ${localCaptures.length} local capture(s)? (your notes on Drive are untouched)`)) return;
+  localCaptures = [];
+  await persistLocalCaptures();
+  $('s-capture-count').textContent = '0';
+  updateHeaderCount();
+};
+
 $('s-clear-btn').onclick = async () => {
   if (!confirm('Clear all cached data?')) return;
   await idbDel('index'); await idbDel('vectors_buf');
+  await idbDel('suggestions'); await idbDel('local_captures');
   Object.values(K).forEach(k => localStorage.removeItem(k));
   location.reload();
 };
@@ -714,8 +792,12 @@ $('search-btn').onclick = async () => {
 
   try {
     const query = await embedText(text);
-    const results = search(query, appVectors, appIndex.notes, 8);
+    const results = search(query, 8);
     renderResults(results, text);
+
+    // Optimistic local append: this thought joins future lookups (not its own search).
+    await addLocalCapture(text, query);
+    updateHeaderCount();
 
     // Save to Drive inbox (fire-and-forget)
     if (cfg(K.INBOX_ID) && cfg(K.CLIENT_ID)) {
@@ -759,7 +841,7 @@ $('setup-connect-btn').onclick = async () => {
 // ── Init ready screen ─────────────────────────────────────────────────────────
 async function initReadyScreen() {
   showScreen('screen-ready');
-  setHeaderStatus(`${appIndex.notes.length} notes`, true);
+  updateHeaderCount();
 
   if (extractor) {
     $('search-btn').disabled = false;
@@ -792,6 +874,7 @@ async function boot() {
 
   setSplash('Checking cached index…', 10);
 
+  await loadLocalCaptures();
   const cached = await loadCached();
 
   if (cached) {
