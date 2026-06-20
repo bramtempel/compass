@@ -229,6 +229,10 @@ input:focus, textarea:focus { border-color: var(--accent); }
       <input type="text" id="s-vectors-id">
     </div>
     <div>
+      <label>suggestions.json — Drive file ID</label>
+      <input type="text" id="s-suggestions-id">
+    </div>
+    <div>
       <label>inbox/ Drive folder ID</label>
       <input type="text" id="s-inbox-id">
     </div>
@@ -248,10 +252,11 @@ input:focus, textarea:focus { border-color: var(--accent); }
 <script type="module">
 // ── Config keys ────────────────────────────────────────────────────────────────
 const K = {
-  CLIENT_ID:  'compass_client_id',
-  INDEX_ID:   'compass_index_id',
-  VECTORS_ID: 'compass_vectors_id',
-  INBOX_ID:   'compass_inbox_id',
+  CLIENT_ID:    'compass_client_id',
+  INDEX_ID:     'compass_index_id',
+  VECTORS_ID:   'compass_vectors_id',
+  SUGGESTIONS_ID: 'compass_suggestions_id',
+  INBOX_ID:     'compass_inbox_id',
   API_KEY:    'compass_api_key',
 };
 
@@ -377,30 +382,41 @@ async function driveUpload(name, folderId, content, token) {
 
 // ── Sync index from Drive ─────────────────────────────────────────────────────
 async function syncFromDrive(token) {
-  const indexId   = cfg(K.INDEX_ID);
-  const vectorsId = cfg(K.VECTORS_ID);
+  const indexId       = cfg(K.INDEX_ID);
+  const vectorsId     = cfg(K.VECTORS_ID);
+  const suggestionsId = cfg(K.SUGGESTIONS_ID);
   if (!indexId || !vectorsId) throw new Error('No Drive file IDs configured.');
 
-  setSplash('Downloading index.json…', 30);
+  setSplash('Downloading index.json…', 25);
   const indexResp = await driveDownload(indexId, token);
   const indexData = await indexResp.json();
 
-  setSplash('Downloading vectors.bin…', 60);
+  setSplash('Downloading vectors.bin…', 50);
   const vecResp = await driveDownload(vectorsId, token);
   const vecBuf  = await vecResp.arrayBuffer();
 
-  setSplash('Storing in cache…', 85);
+  let suggestionsData = null;
+  if (suggestionsId) {
+    setSplash('Downloading suggestions.json…', 75);
+    const sugResp = await driveDownload(suggestionsId, token);
+    suggestionsData = await sugResp.json();
+  }
+
+  setSplash('Storing in cache…', 90);
   await idbSet('index', indexData);
   await idbSet('vectors_buf', vecBuf);
+  if (suggestionsData) await idbSet('suggestions', suggestionsData);
 
-  return { indexData, vectors: decodeF16(vecBuf) };
+  return { indexData, vectors: decodeF16(vecBuf), suggestionsData };
 }
 
 // ── Load cached index ─────────────────────────────────────────────────────────
 async function loadCached() {
-  const [indexData, vecBuf] = await Promise.all([idbGet('index'), idbGet('vectors_buf')]);
+  const [indexData, vecBuf, suggestionsData] = await Promise.all([
+    idbGet('index'), idbGet('vectors_buf'), idbGet('suggestions')
+  ]);
   if (!indexData || !vecBuf) return null;
-  return { indexData, vectors: decodeF16(vecBuf) };
+  return { indexData, vectors: decodeF16(vecBuf), suggestionsData };
 }
 
 // ── Transformers.js embedding ─────────────────────────────────────────────────
@@ -525,6 +541,16 @@ async function saveCapture(noteText) {
 // ── App state ─────────────────────────────────────────────────────────────────
 let appIndex = null;
 let appVectors = null;
+let appSuggestions = null; // Map: cluster_id → suggestion string
+
+function buildSuggestionsMap(data) {
+  if (!data) return null;
+  const map = new Map();
+  for (const entry of Object.values(data)) {
+    map.set(entry.cluster_id, entry.suggestion);
+  }
+  return map;
+}
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -554,12 +580,17 @@ function renderResults(results, noteText) {
   area.style.flexDirection = 'column';
   area.style.gap = '10px';
 
-  // Theme: use cluster label of top result
+  // Theme bar: cluster label + cached suggestion (offline, instant)
   const themeBar = $('theme-bar');
-  const topLabel = results[0]?.cluster_label;
+  const topResult = results[0];
+  const topLabel = topResult?.cluster_label;
+  const cachedSuggestion = appSuggestions?.get(topResult?.cluster_id);
   themeBar.innerHTML = topLabel
-    ? `<span>Theme:</span> <span class="label">${topLabel}</span>`
+    ? `<span>Theme:</span> <span class="label">${esc(topLabel)}</span>`
     : '';
+  if (cachedSuggestion) {
+    themeBar.innerHTML += `<div style="width:100%;margin-top:6px;font-size:.8rem;color:var(--text);line-height:1.5">${esc(cachedSuggestion)}</div>`;
+  }
 
   // Result cards
   const list = $('result-list');
@@ -625,11 +656,12 @@ function folderFromPath(path) {
 
 // ── Settings panel ────────────────────────────────────────────────────────────
 function openSettings() {
-  $('s-client-id').value  = cfg(K.CLIENT_ID);
-  $('s-index-id').value   = cfg(K.INDEX_ID);
-  $('s-vectors-id').value = cfg(K.VECTORS_ID);
-  $('s-inbox-id').value   = cfg(K.INBOX_ID);
-  $('s-api-key').value    = cfg(K.API_KEY);
+  $('s-client-id').value      = cfg(K.CLIENT_ID);
+  $('s-index-id').value       = cfg(K.INDEX_ID);
+  $('s-vectors-id').value     = cfg(K.VECTORS_ID);
+  $('s-suggestions-id').value = cfg(K.SUGGESTIONS_ID) || '1MhHN8EVdBVSNubVbcBJURjya-1ddxh7d';
+  $('s-inbox-id').value       = cfg(K.INBOX_ID);
+  $('s-api-key').value        = cfg(K.API_KEY);
   $('s-status').textContent = '';
   $('settings-overlay').classList.add('open');
 }
@@ -641,11 +673,12 @@ $('settings-btn').onclick = openSettings;
 $('settings-overlay').onclick = e => { if (e.target === $('settings-overlay')) closeSettings(); };
 
 $('s-save-btn').onclick = () => {
-  cfg(K.CLIENT_ID,  $('s-client-id').value.trim());
-  cfg(K.INDEX_ID,   $('s-index-id').value.trim());
-  cfg(K.VECTORS_ID, $('s-vectors-id').value.trim());
-  cfg(K.INBOX_ID,   $('s-inbox-id').value.trim());
-  cfg(K.API_KEY,    $('s-api-key').value.trim());
+  cfg(K.CLIENT_ID,      $('s-client-id').value.trim());
+  cfg(K.INDEX_ID,       $('s-index-id').value.trim());
+  cfg(K.VECTORS_ID,     $('s-vectors-id').value.trim());
+  cfg(K.SUGGESTIONS_ID, $('s-suggestions-id').value.trim());
+  cfg(K.INBOX_ID,       $('s-inbox-id').value.trim());
+  cfg(K.API_KEY,        $('s-api-key').value.trim());
   closeSettings();
 };
 
@@ -654,8 +687,9 @@ $('s-resync-btn').onclick = async () => {
   try {
     const token = await getAccessToken();
     $('s-status').textContent = 'Downloading…';
-    const { indexData, vectors } = await syncFromDrive(token);
+    const { indexData, vectors, suggestionsData } = await syncFromDrive(token);
     appIndex = indexData; appVectors = vectors;
+    appSuggestions = buildSuggestionsMap(suggestionsData);
     $('s-status').textContent = `Synced — ${indexData.notes.length} notes`;
     setHeaderStatus(`${indexData.notes.length} notes`, true);
   } catch (e) {
@@ -709,8 +743,9 @@ $('setup-connect-btn').onclick = async () => {
   $('setup-connect-btn').textContent = 'Connecting…';
   try {
     const token = await getAccessToken(true);
-    const { indexData, vectors } = await syncFromDrive(token);
+    const { indexData, vectors, suggestionsData } = await syncFromDrive(token);
     appIndex = indexData; appVectors = vectors;
+    appSuggestions = buildSuggestionsMap(suggestionsData);
     await initReadyScreen();
   } catch (e) {
     err.textContent = e.message;
@@ -762,6 +797,7 @@ async function boot() {
   if (cached) {
     appIndex = cached.indexData;
     appVectors = cached.vectors;
+    appSuggestions = buildSuggestionsMap(cached.suggestionsData);
     setSplash('Ready', 100);
     hideSplash();
     await initReadyScreen();
