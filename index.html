@@ -489,13 +489,11 @@ Respond with JSON only, no prose outside the JSON:
 
 For each relation label: be specific and terse (max 6 words). Examples: "earlier version of this thought", "resource on this topic", "contradicts this", "same fear, different context", "business angle on this", "prior reflection on this".`;
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+  const r = await fetch('https://snowy-frog-5917.bramtempelaere1.workers.dev', {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'X-Api-Key': apiKey,
       'content-type': 'application/json',
-      'anthropic-dangerous-allow-browser': 'true',
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
