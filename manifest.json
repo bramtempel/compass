@@ -4,11 +4,11 @@
   "description": "Capture a thought, find what it connects to",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0d0d12",
-  "theme_color": "#0d0d12",
+  "background_color": "#1f1f1f",
+  "theme_color": "#1f1f1f",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%237c6af7'/><text y='68' x='50' text-anchor='middle' font-size='60' fill='white'>⬡</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231f1f1f'/><circle cx='50' cy='50' r='30' fill='none' stroke='%231aad4c' stroke-width='8'/><circle cx='50' cy='50' r='8' fill='%231aad4c'/></svg>",
       "sizes": "any",
       "type": "image/svg+xml"
     }

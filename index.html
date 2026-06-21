@@ -4,900 +4,118 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0d0d12">
+<meta name="theme-color" content="#1f1f1f">
 <title>Compass</title>
 <link rel="manifest" href="manifest.json">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:      #0d0d12;
-  --surface: #161621;
-  --s2:      #1e1e2c;
-  --s3:      #26263a;
-  --accent:  #7c6af7;
-  --accent2: #5b4fd4;
-  --text:    #e2e2ee;
-  --muted:   #6b6b85;
-  --dim:     #3a3a55;
-  --ok:      #4ade80;
-  --warn:    #fbbf24;
-  --err:     #f87171;
-}
-
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.5; }
-
-#app { display: flex; flex-direction: column; height: 100%; max-width: 680px; margin: 0 auto; }
-
-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--dim);
-  flex-shrink: 0;
-}
-header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .04em; color: var(--accent); }
-header .status { font-size: .75rem; color: var(--muted); }
-button.icon { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2rem; padding: 4px 6px; border-radius: 6px; }
-button.icon:hover { background: var(--s2); color: var(--text); }
-
-.screen { flex: 1; overflow-y: auto; padding: 20px; display: none; flex-direction: column; gap: 16px; }
-.screen.active { display: flex; }
-
-/* ── Setup ── */
-.setup-card { background: var(--surface); border: 1px solid var(--dim); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-.setup-card h2 { font-size: 1rem; font-weight: 600; }
-.setup-card p { font-size: .85rem; color: var(--muted); line-height: 1.6; }
-label { font-size: .8rem; color: var(--muted); display: block; margin-bottom: 4px; }
-input[type=text], input[type=password], textarea {
-  width: 100%; background: var(--s2); border: 1px solid var(--dim); border-radius: 8px;
-  color: var(--text); font-size: .9rem; padding: 10px 12px; outline: none;
-  font-family: inherit;
-}
-input:focus, textarea:focus { border-color: var(--accent); }
-.btn {
-  background: var(--accent); color: #fff; border: none; border-radius: 8px;
-  padding: 11px 20px; font-size: .9rem; font-weight: 600; cursor: pointer;
-  transition: background .15s;
-}
-.btn:hover { background: var(--accent2); }
-.btn:disabled { opacity: .45; cursor: default; }
-.btn.secondary { background: var(--s3); color: var(--text); }
-.btn.secondary:hover { background: var(--dim); }
-.row { display: flex; gap: 8px; }
-.row .btn { flex: 1; }
-.chip {
-  display: inline-block; font-size: .72rem; background: var(--s3);
-  border-radius: 20px; padding: 2px 10px; color: var(--muted);
-}
-.chip.ok { background: #14532d55; color: var(--ok); }
-.chip.warn { background: #78350f55; color: var(--warn); }
-
-/* ── Progress ── */
-.progress-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 16px; }
-.progress-label { font-size: .85rem; color: var(--muted); }
-.progress-bar { width: 220px; height: 4px; background: var(--s3); border-radius: 2px; overflow: hidden; }
-.progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
-
-/* ── Capture ── */
-#capture-area { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
-#note-input {
-  resize: none; min-height: 120px; font-size: 1rem; line-height: 1.6;
-  background: var(--surface); border: 1px solid var(--dim); border-radius: 10px;
-  padding: 14px;
-}
-#note-input:focus { border-color: var(--accent); }
-#search-btn { width: 100%; }
-.model-status { font-size: .75rem; color: var(--muted); text-align: center; }
-
-/* ── Results ── */
-#results-area { display: flex; flex-direction: column; gap: 10px; }
-.theme-bar {
-  font-size: .8rem; color: var(--muted);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.theme-bar span.label { color: var(--text); font-weight: 500; }
-.result-card {
-  background: var(--surface); border: 1px solid var(--dim); border-radius: 10px;
-  padding: 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer;
-}
-.result-card:hover { border-color: var(--accent); }
-.result-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.result-title { font-size: .9rem; font-weight: 600; line-height: 1.3; }
-.result-score { font-size: .75rem; color: var(--accent); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.result-snippet { font-size: .8rem; color: var(--muted); line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.result-path { font-size: .7rem; color: var(--dim); margin-top: 2px; }
-.result-footer { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-.folder-badge {
-  font-size: .68rem; padding: 2px 8px; border-radius: 20px;
-  background: var(--s3); color: var(--muted); flex-shrink: 0;
-}
-.folder-badge.local { background: #2a1f5e; color: var(--accent); }
-.relation-label {
-  font-size: .72rem; color: var(--accent); font-style: italic;
-}
-
-#suggestion-wrap { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-#suggestion-box {
-  background: var(--s2); border: 1px solid var(--dim); border-radius: 10px;
-  padding: 14px; font-size: .88rem; line-height: 1.6; white-space: pre-wrap;
-}
-.suggestion-note { font-size: .72rem; color: var(--muted); }
-
-/* ── Settings overlay ── */
-#settings-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
-  z-index: 100; align-items: flex-end; justify-content: center;
-}
-#settings-overlay.open { display: flex; }
-#settings-panel {
-  background: var(--surface); border-radius: 16px 16px 0 0;
-  width: 100%; max-width: 680px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
-  max-height: 80vh; overflow-y: auto;
-}
-#settings-panel h2 { font-size: 1rem; font-weight: 600; }
-
-/* ── Loading splash ── */
-#splash { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 200; transition: opacity .3s; }
-#splash.hidden { opacity: 0; pointer-events: none; }
-#splash h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: .06em; }
-#splash p { font-size: .85rem; color: var(--muted); }
-</style>
+<link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <div id="splash">
-  <h1>Compass</h1>
-  <p id="splash-msg">Initializing…</p>
-  <div class="progress-bar" style="width:200px;margin-top:8px">
-    <div class="progress-bar-fill" id="splash-progress" style="width:0%"></div>
-  </div>
+  <div class="logo">Compass</div>
+  <div class="msg" id="splash-msg">Loading…</div>
+  <div class="progress-bar"><div class="progress-fill" id="splash-fill"></div></div>
 </div>
 
 <div id="app">
-  <header>
-    <h1>Compass</h1>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span class="status" id="header-status"></span>
-      <button class="icon" id="settings-btn" title="Settings">⚙</button>
-    </div>
-  </header>
 
-  <!-- Setup screen -->
+  <!-- SETUP (first run) -->
   <div class="screen" id="screen-setup">
-    <div class="setup-card">
-      <h2>Connect your index</h2>
-      <p>You need a Google OAuth Client ID and the file IDs for <code>index.json</code> and <code>vectors.bin</code> from Google Drive. Get file IDs from the Drive URL: <code>…/file/d/<strong>FILE_ID</strong>/view</code></p>
-
-      <div>
-        <label>Google OAuth Client ID</label>
-        <input type="text" id="cfg-client-id" placeholder="12345….apps.googleusercontent.com">
+    <div class="topbar"><span class="brand">Compass</span></div>
+    <div class="screen-content">
+      <div class="card">
+        <h2>Connect</h2>
+        <p>Defaults are pre-filled for this deployment. Add your Anthropic API key for on-tap suggestions, then connect Drive.</p>
+        <div><label>Anthropic API key <span class="field-hint">(optional)</span></label><input type="password" id="setup-api-key" placeholder="sk-ant-…"></div>
+        <button class="btn" id="setup-connect">Connect Drive &amp; download</button>
+        <p class="err-text" id="setup-err" style="display:none"></p>
+        <p class="status-text" id="setup-status"></p>
       </div>
-      <div>
-        <label>index.json — Drive file ID</label>
-        <input type="text" id="cfg-index-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs…">
-      </div>
-      <div>
-        <label>vectors.bin — Drive file ID</label>
-        <input type="text" id="cfg-vectors-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs…">
-      </div>
-      <div>
-        <label>inbox/ — Drive folder ID <span style="color:var(--dim)">(optional, for saving captures)</span></label>
-        <input type="text" id="cfg-inbox-id" placeholder="folder ID">
-      </div>
-      <div>
-        <label>Anthropic API key <span style="color:var(--dim)">(for on-tap suggestions)</span></label>
-        <input type="password" id="cfg-api-key" placeholder="sk-ant-…">
-      </div>
-      <button class="btn" id="setup-connect-btn">Connect Drive &amp; Download Index</button>
-      <p id="setup-error" style="color:var(--err);font-size:.8rem;display:none"></p>
     </div>
   </div>
 
-  <!-- Main capture screen -->
-  <div class="screen" id="screen-ready">
-    <div id="capture-area">
-      <textarea id="note-input" placeholder="What are you thinking about?"></textarea>
-      <div class="model-status" id="model-status"></div>
-      <button class="btn" id="search-btn" disabled>Find related</button>
-    </div>
-
-    <div id="results-area" style="display:none">
-      <div class="theme-bar" id="theme-bar"></div>
-      <div id="result-list"></div>
-      <div id="suggestion-wrap">
-        <button class="btn secondary" id="suggest-btn">Get suggestion</button>
-        <div id="suggestion-box" style="display:none"></div>
-        <p class="suggestion-note" id="suggestion-note" style="display:none">Your note + snippets were sent to Anthropic's API.</p>
+  <!-- CAPTURE -->
+  <div class="screen" id="screen-capture">
+    <div class="topbar">
+      <div class="topbar-left"><span class="brand">Compass</span>
+        <span class="sync-pill" id="sync-pill"><span class="sync-dot"></span>syncing…</span></div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="open-browse" title="Browse all notes">▤</button>
+        <button class="icon-btn" id="open-settings" title="Settings">⚙</button>
       </div>
+    </div>
+    <div class="screen-content">
+      <div class="capture-card">
+        <textarea class="capture-textarea" id="capture-input" placeholder="What's on your mind?"></textarea>
+        <div class="char-count" id="char-count">0 characters</div>
+      </div>
+      <button class="btn" id="capture-btn" disabled>Find related</button>
+      <div class="section-label">Recent captures</div>
+      <div id="recent-list"></div>
+    </div>
+  </div>
+
+  <!-- RELATED -->
+  <div class="screen" id="screen-related">
+    <div class="topbar"><button class="back-btn" data-back="screen-capture">‹ Capture</button></div>
+    <div class="screen-content" id="related-content"></div>
+  </div>
+
+  <!-- BESPOKE -->
+  <div class="screen" id="screen-bespoke">
+    <div class="topbar"><button class="back-btn" data-back="screen-related">‹ Related</button></div>
+    <div class="screen-content" id="bespoke-content"></div>
+  </div>
+
+  <!-- BROWSE -->
+  <div class="screen" id="screen-browse">
+    <div class="topbar"><button class="back-btn" data-back="screen-capture">‹ Capture</button>
+      <span class="browse-count" id="browse-count"></span></div>
+    <div class="screen-content">
+      <div class="search-box"><input class="search-input" id="browse-search" placeholder="Search all notes…"></div>
+      <div id="browse-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- READ SHEET -->
+<div class="sheet-overlay" id="read-sheet">
+  <div class="sheet">
+    <div class="sheet-head">
+      <span class="folder-tag" id="sheet-folder"></span>
+      <button class="sheet-close" id="sheet-close">×</button>
+    </div>
+    <div class="sheet-body">
+      <div class="sheet-title" id="sheet-title"></div>
+      <div class="sheet-meta" id="sheet-meta"></div>
+      <div class="sheet-text" id="sheet-text"></div>
     </div>
   </div>
 </div>
 
-<!-- Settings overlay -->
-<div id="settings-overlay">
-  <div id="settings-panel">
+<!-- SETTINGS -->
+<div class="overlay" id="settings-overlay">
+  <div class="overlay-panel">
     <h2>Settings</h2>
-    <div>
-      <label>Google OAuth Client ID</label>
-      <input type="text" id="s-client-id">
-    </div>
-    <div>
-      <label>index.json Drive file ID</label>
-      <input type="text" id="s-index-id">
-    </div>
-    <div>
-      <label>vectors.bin Drive file ID</label>
-      <input type="text" id="s-vectors-id">
-    </div>
-    <div>
-      <label>suggestions.json — Drive file ID</label>
-      <input type="text" id="s-suggestions-id">
-    </div>
-    <div>
-      <label>inbox/ Drive folder ID</label>
-      <input type="text" id="s-inbox-id">
-    </div>
-    <div>
-      <label>Anthropic API key</label>
-      <input type="password" id="s-api-key">
-    </div>
+    <div><label>Anthropic API key</label><input type="password" id="s-api-key"></div>
+    <div><label>Worker URL</label><input type="text" id="s-worker-url"></div>
+    <div><label>library.json file ID</label><input type="text" id="s-library-id"></div>
+    <div><label>index.json file ID</label><input type="text" id="s-index-id"></div>
+    <div><label>vectors.bin file ID</label><input type="text" id="s-vectors-id"></div>
+    <div><label>suggestions.json file ID</label><input type="text" id="s-suggestions-id"></div>
+    <div><label>inbox/ folder ID</label><input type="text" id="s-inbox-id"></div>
+    <div><label>Google OAuth Client ID</label><input type="text" id="s-client-id"></div>
     <div class="row">
-      <button class="btn" id="s-save-btn">Save &amp; Close</button>
-      <button class="btn secondary" id="s-resync-btn">Re-sync from Drive</button>
+      <button class="btn" id="s-save">Save</button>
+      <button class="btn-secondary" id="s-resync">Re-sync</button>
     </div>
-    <button class="btn secondary" id="s-clear-captures-btn">Clear local captures (<span id="s-capture-count">0</span>)</button>
-    <button class="btn secondary" id="s-clear-btn" style="background:#3a1a1a;color:var(--err)">Clear all data</button>
-    <p id="s-status" style="font-size:.8rem;color:var(--muted)"></p>
+    <button class="btn-secondary" id="s-clear-captures">Clear local captures (<span id="s-cap-count">0</span>)</button>
+    <button class="btn-secondary" id="s-close">Close</button>
+    <p class="status-text" id="s-status"></p>
   </div>
 </div>
 
-<script type="module">
-// ── Config keys ────────────────────────────────────────────────────────────────
-const K = {
-  CLIENT_ID:    'compass_client_id',
-  INDEX_ID:     'compass_index_id',
-  VECTORS_ID:   'compass_vectors_id',
-  SUGGESTIONS_ID: 'compass_suggestions_id',
-  INBOX_ID:     'compass_inbox_id',
-  API_KEY:    'compass_api_key',
-};
-
-function cfg(key, val) {
-  if (val !== undefined) localStorage.setItem(key, val);
-  return localStorage.getItem(key) || '';
-}
-
-// ── IndexedDB ─────────────────────────────────────────────────────────────────
-const DB_NAME = 'compass', DB_VER = 1;
-let _db;
-async function db() {
-  if (_db) return _db;
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = e => {
-      e.target.result.createObjectStore('kv');
-    };
-    req.onsuccess = e => { _db = e.target.result; res(_db); };
-    req.onerror = () => rej(req.error);
-  });
-}
-async function idbGet(key) {
-  const d = await db();
-  return new Promise((res, rej) => {
-    const tx = d.transaction('kv', 'readonly');
-    const req = tx.objectStore('kv').get(key);
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-async function idbSet(key, val) {
-  const d = await db();
-  return new Promise((res, rej) => {
-    const tx = d.transaction('kv', 'readwrite');
-    tx.objectStore('kv').put(val, key);
-    tx.oncomplete = res;
-    tx.onerror = () => rej(tx.error);
-  });
-}
-async function idbDel(key) {
-  const d = await db();
-  return new Promise((res, rej) => {
-    const tx = d.transaction('kv', 'readwrite');
-    tx.objectStore('kv').delete(key);
-    tx.oncomplete = res;
-    tx.onerror = () => rej(tx.error);
-  });
-}
-
-// ── Float16 → Float32 ─────────────────────────────────────────────────────────
-function decodeF16(buffer) {
-  const u16 = new Uint16Array(buffer);
-  const f32 = new Float32Array(u16.length);
-  for (let i = 0; i < u16.length; i++) {
-    const h = u16[i];
-    const s = (h >> 15) & 1;
-    const e = (h >> 10) & 0x1f;
-    const m = h & 0x3ff;
-    let v;
-    if (e === 0)       v = m * 5.960464477539063e-8;   // subnormal
-    else if (e === 31) v = m ? NaN : Infinity;
-    else               v = (1 + m / 1024) * (2 ** (e - 15));
-    f32[i] = s ? -v : v;
-  }
-  return f32;
-}
-
-// ── Google OAuth ──────────────────────────────────────────────────────────────
-let _gisLoaded = false;
-async function loadGIS() {
-  if (_gisLoaded) return;
-  await new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  _gisLoaded = true;
-}
-
-let _accessToken = null;
-async function getAccessToken(forcePrompt = false) {
-  await loadGIS();
-  const clientId = cfg(K.CLIENT_ID);
-  if (!clientId) throw new Error('No Google Client ID configured.');
-  return new Promise((res, rej) => {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive.readonly',
-      callback: r => {
-        if (r.error) return rej(new Error(r.error));
-        _accessToken = r.access_token;
-        res(r.access_token);
-      },
-    });
-    client.requestAccessToken({ prompt: forcePrompt ? 'consent' : '' });
-  });
-}
-
-// ── Drive API ─────────────────────────────────────────────────────────────────
-async function driveDownload(fileId, token) {
-  const r = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (!r.ok) throw new Error(`Drive download failed (${r.status}): ${await r.text()}`);
-  return r;
-}
-
-async function driveUpload(name, folderId, content, token) {
-  const meta = { name, ...(folderId ? { parents: [folderId] } : {}) };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-  form.append('file', new Blob([content], { type: 'text/markdown' }));
-  const r = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-    { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
-  );
-  if (!r.ok) throw new Error(`Drive upload failed (${r.status})`);
-  return r.json();
-}
-
-// ── Sync index from Drive ─────────────────────────────────────────────────────
-async function syncFromDrive(token) {
-  const indexId       = cfg(K.INDEX_ID);
-  const vectorsId     = cfg(K.VECTORS_ID);
-  const suggestionsId = cfg(K.SUGGESTIONS_ID);
-  if (!indexId || !vectorsId) throw new Error('No Drive file IDs configured.');
-
-  setSplash('Downloading index.json…', 25);
-  const indexResp = await driveDownload(indexId, token);
-  const indexData = await indexResp.json();
-
-  setSplash('Downloading vectors.bin…', 50);
-  const vecResp = await driveDownload(vectorsId, token);
-  const vecBuf  = await vecResp.arrayBuffer();
-
-  let suggestionsData = null;
-  if (suggestionsId) {
-    setSplash('Downloading suggestions.json…', 75);
-    const sugResp = await driveDownload(suggestionsId, token);
-    suggestionsData = await sugResp.json();
-  }
-
-  setSplash('Storing in cache…', 90);
-  await idbSet('index', indexData);
-  await idbSet('vectors_buf', vecBuf);
-  if (suggestionsData) await idbSet('suggestions', suggestionsData);
-
-  return { indexData, vectors: decodeF16(vecBuf), suggestionsData };
-}
-
-// ── Load cached index ─────────────────────────────────────────────────────────
-async function loadCached() {
-  const [indexData, vecBuf, suggestionsData] = await Promise.all([
-    idbGet('index'), idbGet('vectors_buf'), idbGet('suggestions')
-  ]);
-  if (!indexData || !vecBuf) return null;
-  return { indexData, vectors: decodeF16(vecBuf), suggestionsData };
-}
-
-// ── Transformers.js embedding ─────────────────────────────────────────────────
-const MODEL_ID = 'Xenova/paraphrase-multilingual-MiniLM-L12-v2';
-const CHUNK_WORDS = 80, CHUNK_OVERLAP = 20, DIM = 384;
-let extractor = null;
-
-function chunkText(text) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= CHUNK_WORDS) return [text];
-  const step = CHUNK_WORDS - CHUNK_OVERLAP;
-  const chunks = [];
-  for (let start = 0; start < words.length; start += step) {
-    chunks.push(words.slice(start, start + CHUNK_WORDS).join(' '));
-    if (start + CHUNK_WORDS >= words.length) break;
-  }
-  return chunks;
-}
-
-async function loadModel(onProgress) {
-  const { pipeline, env } = await import(
-    'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js'
-  );
-  env.allowLocalModels = false;
-  extractor = await pipeline('feature-extraction', MODEL_ID, {
-    progress_callback: p => {
-      if (p.status === 'progress' && onProgress) onProgress(p);
-    },
-  });
-}
-
-async function embedText(text) {
-  if (!extractor) throw new Error('Model not loaded');
-  const chunks = chunkText(text);
-  const pool = new Float32Array(DIM);
-
-  for (const chunk of chunks) {
-    const out = await extractor(chunk, { pooling: 'mean', normalize: false });
-    const data = out.data;
-    for (let i = 0; i < DIM; i++) pool[i] += data[i];
-  }
-
-  for (let i = 0; i < DIM; i++) pool[i] /= chunks.length;
-
-  let norm = 0;
-  for (let i = 0; i < DIM; i++) norm += pool[i] * pool[i];
-  norm = Math.sqrt(norm);
-  if (norm > 1e-9) for (let i = 0; i < DIM; i++) pool[i] /= norm;
-
-  return pool;
-}
-
-// ── Cosine search (dot product of normalized vecs) ────────────────────────────
-// Scores the canonical index AND any local captures, merged into one ranking.
-function search(query, k = 8) {
-  const notes = appIndex.notes;
-  const N = notes.length;
-  const scores = [];
-  for (let i = 0; i < N; i++) {
-    let dot = 0;
-    const off = i * DIM;
-    for (let j = 0; j < DIM; j++) dot += query[j] * appVectors[off + j];
-    scores.push({ note: notes[i], score: dot });
-  }
-  for (const cap of localCaptures) {
-    let dot = 0;
-    const v = cap.vector;
-    for (let j = 0; j < DIM; j++) dot += query[j] * v[j];
-    scores.push({ note: captureToNote(cap), score: dot });
-  }
-  scores.sort((a, b) => b.score - a.score);
-  return scores.slice(0, k).map(s => ({ ...s.note, score: s.score }));
-}
-
-// ── Anthropic suggestion + relationship labels ────────────────────────────────
-async function getSuggestion(noteText, results, apiKey) {
-  const snippets = results.slice(0, 5).map((r, i) =>
-    `[${i}] "${r.title}": ${(r.body || '').slice(0, 150).trim()}`
-  ).join('\n\n');
-
-  const prompt = `You are helping someone process their personal notes.
-
-New thought:
-"${noteText}"
-
-Related notes (indexed 0-${Math.min(results.length, 5) - 1}):
-${snippets}
-
-Respond with JSON only, no prose outside the JSON:
-{
-  "suggestion": "one concrete actionable next step, 2-3 sentences",
-  "relations": ["brief relationship to new thought for note 0", "...for note 1", ...]
-}
-
-For each relation label: be specific and terse (max 6 words). Examples: "earlier version of this thought", "resource on this topic", "contradicts this", "same fear, different context", "business angle on this", "prior reflection on this".`;
-
-  const r = await fetch('https://snowy-frog-5917.bramtempelaere1.workers.dev', {
-    method: 'POST',
-    headers: {
-      'X-Api-Key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  if (!r.ok) throw new Error(`Anthropic API error ${r.status}`);
-  const data = await r.json();
-  const text = data.content[0].text;
-  try {
-    return JSON.parse(text);
-  } catch {
-    // fallback if model doesn't return clean JSON
-    return { suggestion: text, relations: [] };
-  }
-}
-
-// ── Capture to Drive inbox ────────────────────────────────────────────────────
-async function saveCapture(noteText) {
-  const folderId = cfg(K.INBOX_ID);
-  const token = _accessToken || await getAccessToken();
-  const now = new Date().toISOString();
-  const fname = `${Date.now()}.md`;
-  const content = `---\ndate: ${now}\ncreated: ${now}\n---\n\n${noteText}`;
-  await driveUpload(fname, folderId, content, token);
-}
-
-// ── App state ─────────────────────────────────────────────────────────────────
-let appIndex = null;
-let appVectors = null;
-let appSuggestions = null; // Map: cluster_id → suggestion string
-
-function buildSuggestionsMap(data) {
-  if (!data) return null;
-  const map = new Map();
-  for (const entry of Object.values(data)) {
-    map.set(entry.cluster_id, entry.suggestion);
-  }
-  return map;
-}
-
-// ── Local captures (optimistic append) ────────────────────────────────────────
-// Captures you make on this device join the search immediately, before the laptop
-// has folded them into the canonical index. Persisted in IndexedDB.
-// Each entry: { ts, text, title, body, vec:number[] }. In memory we add a Float32Array.
-let localCaptures = []; // [{ ts, text, title, body, vector:Float32Array }]
-
-async function loadLocalCaptures() {
-  const stored = (await idbGet('local_captures')) || [];
-  localCaptures = stored.map(c => ({ ...c, vector: Float32Array.from(c.vec) }));
-}
-
-async function persistLocalCaptures() {
-  // strip the Float32Array; keep a plain number[] for clean structured-clone storage
-  const serializable = localCaptures.map(({ ts, text, title, body, vec }) => ({ ts, text, title, body, vec }));
-  await idbSet('local_captures', serializable);
-}
-
-async function addLocalCapture(text, vector) {
-  const trimmed = text.trim();
-  if (trimmed.length < 15) return;                       // skip throwaway searches
-  if (localCaptures.some(c => c.text.trim() === trimmed)) return; // dedup re-searches
-  const title = trimmed.split('\n')[0].slice(0, 80);
-  const cap = {
-    ts: Date.now(),
-    text: trimmed,
-    title,
-    body: trimmed.slice(0, 2000),
-    vec: Array.from(vector),
-    vector,
-  };
-  localCaptures.push(cap);
-  await persistLocalCaptures();
-}
-
-function captureToNote(cap) {
-  return {
-    id: 'local-' + cap.ts,
-    path: 'local capture',
-    title: cap.title,
-    body: cap.body,
-    cluster_id: null,
-    cluster_label: '',
-    vector: cap.vector,
-    _local: true,
-  };
-}
-
-// ── UI helpers ────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-
-function setSplash(msg, pct) {
-  $('splash-msg').textContent = msg;
-  $('splash-progress').style.width = (pct ?? 0) + '%';
-}
-function hideSplash() {
-  $('splash').classList.add('hidden');
-}
-
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  $(id).classList.add('active');
-}
-
-function setHeaderStatus(text, ok) {
-  const el = $('header-status');
-  el.textContent = text;
-  el.style.color = ok ? 'var(--ok)' : 'var(--muted)';
-}
-
-function updateHeaderCount() {
-  if (!appIndex) return;
-  const base = appIndex.notes.length;
-  const extra = localCaptures.length;
-  setHeaderStatus(extra ? `${base} + ${extra} notes` : `${base} notes`, true);
-}
-
-function renderResults(results, noteText) {
-  const area = $('results-area');
-  area.style.display = 'flex';
-  area.style.flexDirection = 'column';
-  area.style.gap = '10px';
-
-  // Theme bar: cluster label + cached suggestion (offline, instant)
-  const themeBar = $('theme-bar');
-  const topResult = results[0];
-  const topLabel = topResult?.cluster_label;
-  const cachedSuggestion = appSuggestions?.get(topResult?.cluster_id);
-  themeBar.innerHTML = topLabel
-    ? `<span>Theme:</span> <span class="label">${esc(topLabel)}</span>`
-    : '';
-  if (cachedSuggestion) {
-    themeBar.innerHTML += `<div style="width:100%;margin-top:6px;font-size:.8rem;color:var(--text);line-height:1.5">${esc(cachedSuggestion)}</div>`;
-  }
-
-  // Result cards
-  const list = $('result-list');
-  list.innerHTML = '';
-  const cards = [];
-  for (const r of results) {
-    const card = document.createElement('div');
-    card.className = 'result-card';
-    const snippet = (r.body || '').slice(0, 280).trim();
-    const score = (r.score * 100).toFixed(0);
-    const folder = folderFromPath(r.path || '');
-    const badge = r._local
-      ? `<span class="folder-badge local">✦ your capture</span>`
-      : (folder ? `<span class="folder-badge">${esc(folder)}</span>` : '');
-    card.innerHTML = `
-      <div class="result-header">
-        <span class="result-title">${esc(r.title)}</span>
-        <span class="result-score">${score}%</span>
-      </div>
-      ${snippet ? `<div class="result-snippet">${esc(snippet)}</div>` : ''}
-      <div class="result-footer">
-        ${badge}
-        <span class="relation-label" data-relation></span>
-      </div>
-    `;
-    list.appendChild(card);
-    cards.push(card);
-  }
-
-  // Suggestion
-  $('suggestion-box').style.display = 'none';
-  $('suggestion-note').style.display = 'none';
-  $('suggest-btn').style.display = cfg(K.API_KEY) ? 'block' : 'none';
-  $('suggest-btn').onclick = async () => {
-    $('suggest-btn').textContent = 'Thinking…';
-    $('suggest-btn').disabled = true;
-    try {
-      const { suggestion, relations } = await getSuggestion(noteText, results, cfg(K.API_KEY));
-      $('suggestion-box').style.display = 'block';
-      $('suggestion-box').textContent = suggestion;
-      $('suggestion-note').style.display = 'block';
-      // populate relation labels on cards
-      cards.forEach((card, i) => {
-        const el = card.querySelector('[data-relation]');
-        if (el && relations[i]) el.textContent = relations[i];
-      });
-    } catch (e) {
-      $('suggestion-box').style.display = 'block';
-      $('suggestion-box').textContent = 'Error: ' + e.message;
-    } finally {
-      $('suggest-btn').textContent = 'Get suggestion';
-      $('suggest-btn').disabled = false;
-    }
-  };
-}
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function folderFromPath(path) {
-  // e.g. "UpNote_.../Reflection/note.md" → "Reflection"
-  const parts = path.replace(/\\/g, '/').split('/');
-  return parts.length >= 2 ? parts[parts.length - 2] : '';
-}
-
-// ── Settings panel ────────────────────────────────────────────────────────────
-function openSettings() {
-  $('s-client-id').value      = cfg(K.CLIENT_ID);
-  $('s-index-id').value       = cfg(K.INDEX_ID);
-  $('s-vectors-id').value     = cfg(K.VECTORS_ID);
-  $('s-suggestions-id').value = cfg(K.SUGGESTIONS_ID) || '1MhHN8EVdBVSNubVbcBJURjya-1ddxh7d';
-  $('s-inbox-id').value       = cfg(K.INBOX_ID);
-  $('s-api-key').value        = cfg(K.API_KEY);
-  $('s-capture-count').textContent = localCaptures.length;
-  $('s-status').textContent = '';
-  $('settings-overlay').classList.add('open');
-}
-function closeSettings() {
-  $('settings-overlay').classList.remove('open');
-}
-
-$('settings-btn').onclick = openSettings;
-$('settings-overlay').onclick = e => { if (e.target === $('settings-overlay')) closeSettings(); };
-
-$('s-save-btn').onclick = () => {
-  cfg(K.CLIENT_ID,      $('s-client-id').value.trim());
-  cfg(K.INDEX_ID,       $('s-index-id').value.trim());
-  cfg(K.VECTORS_ID,     $('s-vectors-id').value.trim());
-  cfg(K.SUGGESTIONS_ID, $('s-suggestions-id').value.trim());
-  cfg(K.INBOX_ID,       $('s-inbox-id').value.trim());
-  cfg(K.API_KEY,        $('s-api-key').value.trim());
-  closeSettings();
-};
-
-$('s-resync-btn').onclick = async () => {
-  $('s-status').textContent = 'Authenticating…';
-  try {
-    const token = await getAccessToken();
-    $('s-status').textContent = 'Downloading…';
-    const { indexData, vectors, suggestionsData } = await syncFromDrive(token);
-    appIndex = indexData; appVectors = vectors;
-    appSuggestions = buildSuggestionsMap(suggestionsData);
-    $('s-status').textContent = `Synced — ${indexData.notes.length} notes`;
-    updateHeaderCount();
-  } catch (e) {
-    $('s-status').textContent = 'Error: ' + e.message;
-  }
-};
-
-$('s-clear-captures-btn').onclick = async () => {
-  if (!localCaptures.length) return;
-  if (!confirm(`Clear ${localCaptures.length} local capture(s)? (your notes on Drive are untouched)`)) return;
-  localCaptures = [];
-  await persistLocalCaptures();
-  $('s-capture-count').textContent = '0';
-  updateHeaderCount();
-};
-
-$('s-clear-btn').onclick = async () => {
-  if (!confirm('Clear all cached data?')) return;
-  await idbDel('index'); await idbDel('vectors_buf');
-  await idbDel('suggestions'); await idbDel('local_captures');
-  Object.values(K).forEach(k => localStorage.removeItem(k));
-  location.reload();
-};
-
-// ── Search button ─────────────────────────────────────────────────────────────
-$('search-btn').onclick = async () => {
-  const text = $('note-input').value.trim();
-  if (!text) return;
-  $('search-btn').disabled = true;
-  $('search-btn').textContent = 'Embedding…';
-  $('results-area').style.display = 'none';
-
-  try {
-    const query = await embedText(text);
-    const results = search(query, 8);
-    renderResults(results, text);
-
-    // Optimistic local append: this thought joins future lookups (not its own search).
-    await addLocalCapture(text, query);
-    updateHeaderCount();
-
-    // Save to Drive inbox (fire-and-forget)
-    if (cfg(K.INBOX_ID) && cfg(K.CLIENT_ID)) {
-      saveCapture(text).catch(console.warn);
-    }
-  } catch (e) {
-    alert('Embedding error: ' + e.message);
-  } finally {
-    $('search-btn').disabled = false;
-    $('search-btn').textContent = 'Find related';
-  }
-};
-
-// ── Setup screen ──────────────────────────────────────────────────────────────
-$('setup-connect-btn').onclick = async () => {
-  cfg(K.CLIENT_ID,  $('cfg-client-id').value.trim());
-  cfg(K.INDEX_ID,   $('cfg-index-id').value.trim());
-  cfg(K.VECTORS_ID, $('cfg-vectors-id').value.trim());
-  cfg(K.INBOX_ID,   $('cfg-inbox-id').value.trim());
-  cfg(K.API_KEY,    $('cfg-api-key').value.trim());
-
-  const err = $('setup-error');
-  err.style.display = 'none';
-  $('setup-connect-btn').disabled = true;
-  $('setup-connect-btn').textContent = 'Connecting…';
-  try {
-    const token = await getAccessToken(true);
-    const { indexData, vectors, suggestionsData } = await syncFromDrive(token);
-    appIndex = indexData; appVectors = vectors;
-    appSuggestions = buildSuggestionsMap(suggestionsData);
-    await initReadyScreen();
-  } catch (e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
-  } finally {
-    $('setup-connect-btn').disabled = false;
-    $('setup-connect-btn').textContent = 'Connect Drive & Download Index';
-  }
-};
-
-// ── Init ready screen ─────────────────────────────────────────────────────────
-async function initReadyScreen() {
-  showScreen('screen-ready');
-  updateHeaderCount();
-
-  if (extractor) {
-    $('search-btn').disabled = false;
-    $('model-status').textContent = '';
-    return;
-  }
-
-  $('model-status').textContent = 'Loading embedding model (first time: ~120 MB)…';
-  $('search-btn').disabled = true;
-
-  try {
-    await loadModel(p => {
-      if (p.file && p.loaded != null && p.total != null) {
-        const pct = Math.round(100 * p.loaded / p.total);
-        $('model-status').textContent = `Loading model: ${p.file} ${pct}%`;
-      }
-    });
-    $('search-btn').disabled = false;
-    $('model-status').textContent = '';
-  } catch (e) {
-    $('model-status').textContent = 'Model load failed: ' + e.message;
-  }
-}
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
-async function boot() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(console.warn);
-  }
-
-  setSplash('Checking cached index…', 10);
-
-  await loadLocalCaptures();
-  const cached = await loadCached();
-
-  if (cached) {
-    appIndex = cached.indexData;
-    appVectors = cached.vectors;
-    appSuggestions = buildSuggestionsMap(cached.suggestionsData);
-    setSplash('Ready', 100);
-    hideSplash();
-    await initReadyScreen();
-  } else {
-    // Need setup
-    hideSplash();
-    // Pre-fill from localStorage if partially configured
-    $('cfg-client-id').value  = cfg(K.CLIENT_ID);
-    $('cfg-index-id').value   = cfg(K.INDEX_ID);
-    $('cfg-vectors-id').value = cfg(K.VECTORS_ID);
-    $('cfg-inbox-id').value   = cfg(K.INBOX_ID);
-    $('cfg-api-key').value    = cfg(K.API_KEY);
-    showScreen('screen-setup');
-  }
-}
-
-boot();
-</script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
