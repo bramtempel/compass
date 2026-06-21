@@ -25,8 +25,25 @@ export async function loadModel(onProgress) {
   const { pipeline, env } = await import(
     'https://cdn.jsdelivr.net/npm/@xenova/transformers@2/dist/transformers.esm.min.js');
   env.allowLocalModels = false;
+
+  // Aggregate per-file download progress into one overall number.
+  const files = {};
   extractor = await pipeline('feature-extraction', MODEL_ID, {
-    progress_callback: p => { if (p.status === 'progress' && onProgress) onProgress(p); },
+    progress_callback: p => {
+      if (p.file) {
+        const e = files[p.file] || (files[p.file] = { loaded: 0, total: 0 });
+        if (p.total) e.total = p.total;
+        if (p.status === 'done') e.loaded = e.total || e.loaded;
+        else if (p.loaded != null) e.loaded = p.loaded;
+      }
+      let loaded = 0, total = 0;
+      for (const f of Object.values(files)) { loaded += f.loaded; total += f.total; }
+      onProgress && onProgress({
+        status: p.status, file: p.file,
+        loaded, total, pct: total ? Math.round(100 * loaded / total) : null,
+        nFiles: Object.keys(files).length,
+      });
+    },
   });
 }
 

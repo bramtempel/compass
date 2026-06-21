@@ -1,4 +1,4 @@
-const CACHE = 'compass-v5';
+const CACHE = 'compass-v6';
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/app.js', './js/config.js', './js/db.js', './js/drive.js', './js/embed.js',

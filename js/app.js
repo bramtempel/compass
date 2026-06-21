@@ -53,18 +53,36 @@ capBtn.addEventListener('click', () => {
 });
 
 let modelLoading = false;
+const mb = n => (n / 1048576).toFixed(1);
 async function loadModelFlow() {
   modelLoading = true;
   capBtn.disabled = true; capBtn.textContent = 'Loading model…';
+  const status = $('model-status');
+  status.classList.remove('err');
+  status.textContent = 'Starting model download (first time only, ~130 MB)…';
+  let lastLogged = 0;
   try {
-    await loadModel(p => { if (p.total) capBtn.textContent = `Loading model ${Math.round(100 * p.loaded / p.total)}%`; });
+    await loadModel(p => {
+      if (p.total) {
+        status.textContent = `Downloading model… ${mb(p.loaded)} / ${mb(p.total)} MB (${p.pct}%)`;
+        capBtn.textContent = `Loading model ${p.pct}%`;
+        if (p.pct >= lastLogged + 5) { lastLogged = p.pct; console.log(`[model] ${p.pct}% — ${mb(p.loaded)}/${mb(p.total)} MB`); }
+      } else {
+        status.textContent = `Preparing model… (${p.status}${p.file ? ': ' + p.file : ''})`;
+        console.log('[model]', p.status, p.file || '');
+      }
+    });
     modelLoading = false;
+    status.textContent = '';
+    console.log('[model] ready');
     refreshCaptureBtn();
   } catch (e) {
     modelLoading = false;
     capBtn.disabled = false;
     capBtn.textContent = 'Model failed — tap to retry';
-    console.warn('model load failed:', e);
+    status.classList.add('err');
+    status.textContent = 'Model failed: ' + (e?.message || e) + ' — tap the button to retry';
+    console.warn('[model] load failed:', e);
   }
 }
 
