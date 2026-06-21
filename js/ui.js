@@ -36,14 +36,32 @@ export function showScreen(id) {
   if (node) node.scrollTop = 0;
 }
 
+// Whether note images are hosted (flat Files/ at app root). Off => show placeholders.
+let _imagesHosted = false;
+export function setImagesHosted(v) { _imagesHosted = !!v; }
+
+function fileName(src) {
+  try { return decodeURIComponent(src.split('/').pop()); } catch { return src.split('/').pop(); }
+}
+
 // Minimal, safe markdown -> HTML. Escapes first, then applies a small subset.
 export function renderMarkdown(md) {
   let s = esc(md || '');
+  // images: ![alt](src) -> <img> if hosted, else a tasteful placeholder chip
+  s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+    if (_imagesHosted) return `<img class="note-img" loading="lazy" src="${src}" alt="${alt}">`;
+    return `<span class="img-chip">🖼 ${alt || fileName(src)}</span>`;
+  });
+  // links: [text](url) -> external anchor
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    (_, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`);
   // code spans
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
   // bold / italic
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  // UpNote exports use literal <br> for line breaks — allow just that tag back
+  s = s.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
   const lines = s.split('\n');
   const out = [];
   let inList = null; // 'ul' | 'ol'

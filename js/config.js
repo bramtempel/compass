@@ -10,6 +10,7 @@ export const K = {
   INBOX_ID:       'compass_inbox_id',
   API_KEY:        'compass_api_key',
   WORKER_URL:     'compass_worker_url',
+  IMAGES:         'compass_images',   // 'on' once note images are hosted at Files/
 };
 
 const DEFAULTS = {

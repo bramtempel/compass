@@ -10,7 +10,7 @@ import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, cl
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
 import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
-import { $, el, esc, showScreen, renderMarkdown, folderFromPath, relativeTime } from './ui.js';
+import { $, el, esc, showScreen, renderMarkdown, setImagesHosted, folderFromPath, relativeTime } from './ui.js';
 
 // ── state ──
 let index = null;        // index.json
@@ -196,7 +196,7 @@ function openReadSheet(note) {
   $('sheet-folder').textContent = full.folder || folderFromPath(full.path) || '';
   $('sheet-title').textContent = full.title || 'Untitled';
   $('sheet-meta').textContent = full.modified ? relativeTime(full.modified) : '';
-  $('sheet-text').textContent = full.body || '(no body)';
+  $('sheet-text').innerHTML = renderMarkdown(full.body || '(no body)');
   $('read-sheet').classList.add('open');
 }
 $('sheet-close').addEventListener('click', () => $('read-sheet').classList.remove('open'));
@@ -292,6 +292,7 @@ async function enterApp() {
 // ── boot ──
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  setImagesHosted(cfg(K.IMAGES) === 'on');
   setSplash('Loading cached notes…', 15);
   await loadCaptures();
   const cached = await loadCached();
