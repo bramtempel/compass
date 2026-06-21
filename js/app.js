@@ -335,13 +335,14 @@ async function enterApp() {
   hideSplash();
   renderRecent();
   refreshCaptureBtn();
-  if (!modelReady()) loadModelFlow();
+  // model download was already kicked off in boot()
 }
 
 // ── boot ──
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
   initMerge();
+  loadModelFlow();                       // start the ~120MB model download immediately, in parallel
   setSplash('Loading cached notes…', 15);
   await loadCaptures();
   const cached = await loadCached();
