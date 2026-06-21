@@ -1,4 +1,4 @@
-const CACHE = 'compass-v4';
+const CACHE = 'compass-v5';
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/app.js', './js/config.js', './js/db.js', './js/drive.js', './js/embed.js',
@@ -12,8 +12,10 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
+  // Only drop OLD compass shells — never touch 'transformers-cache' (the ~120MB model)
+  // or any other app's cache, or the model re-downloads on every version bump.
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+    Promise.all(keys.filter(k => k.startsWith('compass-') && k !== CACHE).map(k => caches.delete(k)))));
   self.clients.claim();
 });
 

@@ -47,7 +47,26 @@ capInput.addEventListener('input', () => {
   charCount.textContent = `${n} character${n === 1 ? '' : 's'}`;
   refreshCaptureBtn();
 });
-capBtn.addEventListener('click', doCapture);
+capBtn.addEventListener('click', () => {
+  if (modelReady()) return doCapture();
+  if (!modelLoading) loadModelFlow();          // failed/idle → retry the download
+});
+
+let modelLoading = false;
+async function loadModelFlow() {
+  modelLoading = true;
+  capBtn.disabled = true; capBtn.textContent = 'Loading model…';
+  try {
+    await loadModel(p => { if (p.total) capBtn.textContent = `Loading model ${Math.round(100 * p.loaded / p.total)}%`; });
+    modelLoading = false;
+    refreshCaptureBtn();
+  } catch (e) {
+    modelLoading = false;
+    capBtn.disabled = false;
+    capBtn.textContent = 'Model failed — tap to retry';
+    console.warn('model load failed:', e);
+  }
+}
 
 function renderRecent() {
   const list = $('recent-list');
@@ -316,12 +335,7 @@ async function enterApp() {
   hideSplash();
   renderRecent();
   refreshCaptureBtn();
-  if (!modelReady()) {
-    capBtn.textContent = 'Loading model…';
-    loadModel(p => { if (p.total) capBtn.textContent = `Loading model ${Math.round(100 * p.loaded / p.total)}%`; })
-      .then(() => refreshCaptureBtn())
-      .catch(() => { capBtn.textContent = 'Model failed to load'; });
-  }
+  if (!modelReady()) loadModelFlow();
 }
 
 // ── boot ──
