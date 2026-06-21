@@ -59,6 +59,20 @@
   <div class="screen" id="screen-related">
     <div class="topbar"><button class="back-btn" data-back="screen-capture">‹ Capture</button></div>
     <div class="screen-content" id="related-content"></div>
+    <div class="float-wrap" id="float-wrap"><button class="float-btn" id="float-merge">Merge selected (0)</button></div>
+  </div>
+
+  <!-- MERGE RESULT -->
+  <div class="screen" id="screen-merge-result">
+    <div class="topbar"><button class="back-btn" id="merge-result-back">‹ Related</button></div>
+    <div class="screen-content">
+      <input id="merge-title-input" class="merge-title-input" placeholder="Title">
+      <div class="section-label">Merged note</div>
+      <textarea id="merge-result-body" class="result-ta tall"></textarea>
+      <div class="tag-row" id="merge-tags"></div>
+      <button class="btn" id="merge-save">Save note</button>
+      <button class="btn-secondary" id="merge-discard">Discard</button>
+    </div>
   </div>
 
   <!-- BESPOKE -->
@@ -91,6 +105,29 @@
       <div class="sheet-meta" id="sheet-meta"></div>
       <div class="sheet-text" id="sheet-text"></div>
     </div>
+  </div>
+</div>
+
+<!-- MERGE OVERLAY -->
+<div class="overlay-full" id="overlay-merge">
+  <div class="overlay-full-head">
+    <div><div class="overlay-title">Merge</div><div class="overlay-sub" id="merge-subtitle"></div></div>
+    <button class="sheet-close" id="merge-close">×</button>
+  </div>
+  <div class="overlay-full-body">
+    <div class="section-label">Tap a line to add / remove it</div>
+    <div class="diff-legend"><span><span class="d-dot new"></span>new</span><span><span class="d-dot exist"></span>existing</span><span><span class="d-dot rem"></span>removed</span></div>
+    <div id="merge-diff" class="diff-wrap"></div>
+    <div class="section-label">Result</div>
+    <textarea id="merge-result-ta" class="result-ta"></textarea>
+    <div class="row">
+      <button class="btn-secondary" id="merge-reset">Reset</button>
+      <button class="btn-secondary" id="merge-rewrite">Rewrite with AI</button>
+    </div>
+  </div>
+  <div class="overlay-full-foot">
+    <button class="btn-secondary" id="merge-cancel">Cancel</button>
+    <button class="btn" id="merge-approve">Approve</button>
   </div>
 </div>
 

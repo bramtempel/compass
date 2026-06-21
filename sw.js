@@ -1,9 +1,9 @@
-const CACHE = 'compass-v3';
+const CACHE = 'compass-v4';
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/app.js', './js/config.js', './js/db.js', './js/drive.js', './js/embed.js',
   './js/search.js', './js/library.js', './js/captures.js', './js/suggestions.js',
-  './js/bespoke.js', './js/sync.js', './js/ui.js', './js/images.js',
+  './js/bespoke.js', './js/sync.js', './js/ui.js', './js/images.js', './js/merge.js',
 ];
 
 self.addEventListener('install', e => {

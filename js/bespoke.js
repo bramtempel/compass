@@ -43,3 +43,25 @@ Pick the 2-3 MOST relevant passages — verbatim excerpts from the notes above (
     return [{ title: 'Response', excerpt: text, folder: '' }];
   }
 }
+
+// Weave an assembled merge draft into one cohesive note, in the writer's voice.
+export async function rewriteMerge(draft) {
+  const apiKey = cfg(K.API_KEY), workerUrl = cfg(K.WORKER_URL);
+  if (!apiKey) throw new Error('No Anthropic API key set (Settings).');
+  if (!workerUrl) throw new Error('No Worker URL set (Settings).');
+
+  const prompt = `Weave the following fragments — drawn from the writer's own past notes plus a new thought — into ONE clear, cohesive note in their first-person voice. Preserve their meaning and phrasing where possible; do not invent new claims or add commentary. Return only the woven note prose, no preamble.\n\n${draft}`;
+
+  const r = await fetch(workerUrl, {
+    method: 'POST',
+    headers: { 'X-Api-Key': apiKey, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!r.ok) throw new Error(`API error ${r.status}`);
+  const data = await r.json();
+  return (data.content?.[0]?.text ?? '').trim();
+}

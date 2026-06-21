@@ -11,6 +11,7 @@ import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } fro
 import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
 import { setImageManifest, hasManifest, hydrate as hydrateImages } from './images.js';
+import { initMerge, openMerge } from './merge.js';
 import { $, el, esc, showScreen, renderMarkdown, setImagesHosted, folderFromPath, relativeTime } from './ui.js';
 
 // ── state ──
@@ -105,7 +106,8 @@ function renderRelated() {
   }
 
   c.appendChild(el('div', 'section-label', `Related notes · ${results.length} found offline`));
-  for (const r of results) c.appendChild(noteCard(r));
+  selected = new Set(); updateFloat();
+  results.forEach((r, i) => c.appendChild(noteCard(r, i)));
 
   const sugg = top ? suggestionFor(top.cluster_id) : null;
   if (sugg) {
@@ -124,16 +126,38 @@ function renderRelated() {
   }
 }
 
-function noteCard(r) {
+let selected = new Set();
+
+function noteCard(r, idx) {
   const card = el('div', 'note-card' + (r._local ? ' local' : ''));
   const folder = r.folder || folderFromPath(r.path) || '';
   const snippet = (r.body || '').slice(0, 200).trim();
   card.innerHTML = `
-    <div class="note-card-top"><span class="note-title">${esc(r.title)}</span><span class="note-score">${(r.score * 100).toFixed(0)}%</span></div>
+    <div class="note-card-top">
+      <span class="card-check">✓</span>
+      <span class="note-title">${esc(r.title)}</span>
+      <span class="note-score">${(r.score * 100).toFixed(0)}%</span>
+    </div>
     ${snippet ? `<div class="note-snippet">${esc(snippet)}</div>` : ''}
-    <div class="note-card-bottom"><span class="folder-tag">${esc(r._local ? '✦ your capture' : folder)}</span></div>`;
+    <div class="note-card-bottom"><span class="folder-tag">${esc(r._local ? '✦ your capture' : folder)}</span><button class="merge-btn">Merge</button></div>`;
+  card.querySelector('.card-check').addEventListener('click', e => { e.stopPropagation(); toggleSelect(idx, card); });
+  card.querySelector('.merge-btn').addEventListener('click', e => { e.stopPropagation(); openMerge([results[idx]], thought, mergeSaved); });
   card.addEventListener('click', () => openReadSheet(r));
   return card;
+}
+
+function toggleSelect(idx, card) {
+  if (selected.has(idx)) { selected.delete(idx); card.classList.remove('sel'); }
+  else { selected.add(idx); card.classList.add('sel'); }
+  updateFloat();
+}
+function updateFloat() {
+  const n = selected.size;
+  $('float-wrap').classList.toggle('on', n > 0);
+  $('float-merge').textContent = `Merge selected (${n})`;
+}
+async function mergeSaved({ body }) {
+  try { const q = await embedText(body); await addCapture(body, q); renderRecent(); } catch {}
 }
 
 // ── Bespoke screen ──
@@ -196,6 +220,10 @@ function renderBrowse(query = '') {
 }
 $('browse-search').addEventListener('input', e => renderBrowse(e.target.value));
 $('open-browse').addEventListener('click', () => { renderBrowse($('browse-search').value); showScreen('screen-browse'); });
+$('float-merge').addEventListener('click', () => {
+  const ns = [...selected].map(i => results[i]).filter(Boolean);
+  if (ns.length) openMerge(ns, thought, mergeSaved);
+});
 
 // ── Read sheet ──
 function openReadSheet(note) {
@@ -299,6 +327,7 @@ async function enterApp() {
 // ── boot ──
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  initMerge();
   setSplash('Loading cached notes…', 15);
   await loadCaptures();
   const cached = await loadCached();
