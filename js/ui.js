@@ -47,10 +47,17 @@ function fileName(src) {
 // Minimal, safe markdown -> HTML. Escapes first, then applies a small subset.
 export function renderMarkdown(md) {
   let s = esc(md || '');
-  // images: ![alt](src) -> <img> if hosted, else a tasteful placeholder chip
+  // images: ![alt](src). Hosted + image ext -> hydratable wrapper (images.js fills it
+  // with a Drive blob). Otherwise a tasteful placeholder chip.
   s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-    if (_imagesHosted) return `<img class="note-img" loading="lazy" src="${src}" alt="${alt}">`;
-    return `<span class="img-chip">🖼 ${alt || fileName(src)}</span>`;
+    const name = fileName(src);
+    const isImg = /\.(jpe?g|png|gif|webp|svg)$/i.test(name);
+    const a = alt.replace(/"/g, '&quot;');
+    const label = alt || name;
+    if (_imagesHosted && isImg) {
+      return `<span class="note-img-wrap" data-file="${name.replace(/"/g, '&quot;')}" data-alt="${a}"><span class="img-chip">🖼 ${label}…</span></span>`;
+    }
+    return `<span class="img-chip">${isImg ? '🖼' : '📎'} ${label}</span>`;
   });
   // links: [text](url) -> external anchor
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,

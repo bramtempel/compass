@@ -8,9 +8,9 @@ export const K = {
   SUGGESTIONS_ID: 'compass_suggestions_id',
   LIBRARY_ID:     'compass_library_id',
   INBOX_ID:       'compass_inbox_id',
-  API_KEY:        'compass_api_key',
-  WORKER_URL:     'compass_worker_url',
-  IMAGES:         'compass_images',   // 'on' once note images are hosted at Files/
+  API_KEY:            'compass_api_key',
+  WORKER_URL:         'compass_worker_url',
+  IMAGES_MANIFEST_ID: 'compass_images_manifest_id', // images.json (basename->driveId)
 };
 
 const DEFAULTS = {

@@ -10,6 +10,7 @@ import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, cl
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
 import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
+import { setImageManifest, hasManifest, hydrate as hydrateImages } from './images.js';
 import { $, el, esc, showScreen, renderMarkdown, setImagesHosted, folderFromPath, relativeTime } from './ui.js';
 
 // ── state ──
@@ -17,6 +18,12 @@ let index = null;        // index.json
 let vectors = null;      // Float32Array
 let thought = '';        // current captured text
 let results = [];        // current related results (enriched)
+
+function applyData(d) {
+  index = d.index; vectors = d.vectors;
+  setSuggestions(d.suggestions); setLibrary(d.library);
+  setImageManifest(d.images); setImagesHosted(hasManifest());
+}
 
 // ── splash / sync indicator ──
 const setSplash = (msg, pct) => { $('splash-msg').textContent = msg; if (pct != null) $('splash-fill').style.width = pct + '%'; };
@@ -198,6 +205,7 @@ function openReadSheet(note) {
   $('sheet-meta').textContent = full.modified ? relativeTime(full.modified) : '';
   $('sheet-text').innerHTML = renderMarkdown(full.body || '(no body)');
   $('read-sheet').classList.add('open');
+  if (hasManifest()) hydrateImages($('sheet-text'), cachedToken());
 }
 $('sheet-close').addEventListener('click', () => $('read-sheet').classList.remove('open'));
 $('read-sheet').addEventListener('click', e => { if (e.target.id === 'read-sheet') $('read-sheet').classList.remove('open'); });
@@ -208,6 +216,7 @@ document.querySelectorAll('[data-back]').forEach(b =>
 
 // ── Settings ──
 const sFields = { 's-api-key': K.API_KEY, 's-worker-url': K.WORKER_URL, 's-library-id': K.LIBRARY_ID,
+  's-images-id': K.IMAGES_MANIFEST_ID,
   's-index-id': K.INDEX_ID, 's-vectors-id': K.VECTORS_ID, 's-suggestions-id': K.SUGGESTIONS_ID,
   's-inbox-id': K.INBOX_ID, 's-client-id': K.CLIENT_ID };
 function openSettings() {
@@ -253,8 +262,7 @@ async function doSync(token) {
   syncPill(true);
   try {
     const data = await syncFromDrive(token, (stage, pct) => setSplash(`Syncing ${stage}…`, pct));
-    index = data.index; vectors = data.vectors;
-    setSuggestions(data.suggestions); setLibrary(data.library);
+    applyData(data);
   } finally { syncPill(false); }
 }
 
@@ -267,8 +275,7 @@ async function backgroundSync() {
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
     ]);
     const data = await syncFromDrive(token);
-    index = data.index; vectors = data.vectors;
-    setSuggestions(data.suggestions); setLibrary(data.library);
+    applyData(data);
     if ($('screen-browse').classList.contains('active')) renderBrowse($('browse-search').value);
     renderRecent();
   } catch { /* stay on cached data */ }
@@ -292,13 +299,11 @@ async function enterApp() {
 // ── boot ──
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
-  setImagesHosted(cfg(K.IMAGES) === 'on');
   setSplash('Loading cached notes…', 15);
   await loadCaptures();
   const cached = await loadCached();
   if (cached) {
-    index = cached.index; vectors = cached.vectors;
-    setSuggestions(cached.suggestions); setLibrary(cached.library);
+    applyData(cached);
     setSplash('Ready', 100);
     await enterApp();
     backgroundSync();                    // refresh in the background
