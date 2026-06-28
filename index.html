@@ -92,12 +92,14 @@
         <div class="browse-folders" id="browse-folders"></div>
         <div class="browse-controls">
           <span class="browse-scope" id="browse-scope"></span>
+          <button class="themes-toggle" id="themes-toggle" aria-expanded="false">Themes</button>
           <select class="browse-sort" id="browse-sort" aria-label="Sort notes">
             <option value="modified">Recently updated</option>
             <option value="created">Recently created</option>
             <option value="title">Title A–Z</option>
           </select>
         </div>
+        <div class="browse-themes" id="browse-themes" hidden></div>
       </div>
       <div id="browse-list"></div>
     </div>
@@ -110,6 +112,7 @@
   <div class="sheet">
     <div class="sheet-head">
       <span class="folder-tag" id="sheet-folder"></span>
+      <button class="sheet-pin" id="sheet-pin" title="Pin">☆</button>
       <button class="sheet-close" id="sheet-close">×</button>
     </div>
     <div class="sheet-body">

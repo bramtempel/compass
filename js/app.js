@@ -5,7 +5,8 @@ import { idbDel } from './db.js';
 import { getAccessToken, driveUpload, cachedToken } from './drive.js';
 import { loadModel, embedText, modelReady } from './embed.js';
 import { search } from './search.js';
-import { setLibrary, libraryCount, fullNote, allNotes, folders, notesIn } from './library.js';
+import { setLibrary, libraryCount, fullNote, allNotes, folders, notesIn, noteByHash } from './library.js';
+import { isPinned, togglePin, pinnedHashes, recentHashes, pushRecent } from './browse.js';
 import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, clearCaptures } from './captures.js';
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
 import { getBespoke } from './bespoke.js';
@@ -24,6 +25,7 @@ function applyData(d) {
   index = d.index; vectors = d.vectors;
   setSuggestions(d.suggestions); setLibrary(d.library);
   setImageManifest(d.images); setImagesHosted(hasManifest());
+  buildThemes();
 }
 
 // ── splash / sync indicator ──
@@ -240,21 +242,71 @@ function paintPassages(c, passages) {
 let browseFolder = null;        // null = All Notes
 let browseSort = 'modified';    // 'modified' | 'created' | 'title'
 let browseSearchAll = false;    // while searching: ignore the folder scope
+let browseTheme = null;         // active cluster label, or null
+let themesOpen = false;         // theme chip strip expanded?
 let browseObserver = null;      // incremental-reveal IntersectionObserver
 const BROWSE_CHUNK = 60;
 const DAY = 86400000;
+
+// Themes are read-only from the AI index (cluster_label, joined by path — D10/D12).
+let themeByPath = new Map();    // normalized path -> cluster_label
+let themeList = [];             // [{label, short, count}] substantial themes only
+const normP = p => (p || '').replace(/\\/g, '/').toLowerCase();
+
+function buildThemes() {
+  themeByPath = new Map();
+  themeList = [];
+  if (index && index.notes) for (const n of index.notes)
+    if (n.cluster_label) themeByPath.set(normP(n.path), n.cluster_label);
+  const counts = new Map();
+  for (const n of allNotes()) {
+    const lbl = themeByPath.get(normP(n.path));
+    if (lbl) counts.set(lbl, (counts.get(lbl) || 0) + 1);
+  }
+  themeList = [...counts.entries()]
+    .filter(([, c]) => c >= 3)                  // skip orphans / tiny clusters — too noisy
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count, short: label.split(' · ').slice(0, 2).join(' · ') }));
+}
+const themeOf = path => themeByPath.get(normP(path)) || null;
+function notesInTheme(label, q) {
+  const t = (q || '').trim().toLowerCase();
+  return allNotes().filter(n => themeOf(n.path) === label &&
+    (!t || (n.title || '').toLowerCase().includes(t) || (n.body || '').toLowerCase().includes(t)));
+}
 
 function renderFolderChips() {
   const bar = $('browse-folders');
   bar.innerHTML = '';
   const mk = (name, count, value) => {
-    const c = el('button', 'folder-chip' + (browseFolder === value ? ' active' : ''));
+    const c = el('button', 'folder-chip' + (browseFolder === value && !browseTheme ? ' active' : ''));
     c.innerHTML = `${esc(name)} <span class="n">${count}</span>`;
-    c.addEventListener('click', () => { browseFolder = value; browseSearchAll = false; renderBrowse($('browse-search').value); });
+    c.addEventListener('click', () => {
+      browseFolder = value; browseTheme = null; browseSearchAll = false;
+      renderBrowse($('browse-search').value);
+    });
     return c;
   };
   bar.appendChild(mk('All Notes', allNotes().length, null));
   for (const f of folders()) bar.appendChild(mk(f.name, f.count, f.name));
+}
+
+function renderThemeChips() {
+  const bar = $('browse-themes');
+  bar.hidden = !themesOpen;
+  bar.innerHTML = '';
+  if (!themesOpen) return;
+  if (!themeList.length) { bar.appendChild(el('div', 'themes-empty', 'No themes yet — sync your notes.')); return; }
+  for (const t of themeList) {
+    const c = el('button', 'theme-chip' + (browseTheme === t.label ? ' active' : ''));
+    c.title = t.label;
+    c.innerHTML = `${esc(t.short)} <span class="n">${t.count}</span>`;
+    c.addEventListener('click', () => {
+      browseTheme = (browseTheme === t.label) ? null : t.label;   // toggle off if re-clicked
+      renderBrowse($('browse-search').value);
+    });
+    bar.appendChild(c);
+  }
 }
 
 // Bucket a note for the current sort: date buckets for date sorts, first letter for title.
@@ -285,8 +337,9 @@ function sortNotes(list) {
 function browseRow(n, query) {
   const row = el('div', 'browse-row');
   const date = relativeTime(browseSort === 'created' ? n.created : n.modified);
+  const pin = isPinned(n.hash) ? '<span class="row-pin">★</span> ' : '';
   row.innerHTML =
-    `<div class="browse-row-top"><span class="t">${highlight(n.title, query)}</span>` +
+    `<div class="browse-row-top"><span class="t">${pin}${highlight(n.title, query)}</span>` +
     (date ? `<span class="d">${esc(date)}</span>` : '') + '</div>' +
     `<span class="s">${highlight(snippet(n.body, query), query)}</span>` +
     (n.folder ? `<div class="browse-row-foot"><span class="folder-tag">${esc(n.folder)}</span></div>` : '');
@@ -309,23 +362,42 @@ function renderScopeHint(query) {
 
 function renderBrowse(query = '') {
   renderFolderChips();
+  renderThemeChips();
   renderScopeHint(query);
   const list = $('browse-list');
   list.innerHTML = '';
   if (browseObserver) { browseObserver.disconnect(); browseObserver = null; }
 
-  const scopeFolder = (query && browseSearchAll) ? null : browseFolder;
-  const notes = sortNotes(notesIn(scopeFolder, query));
+  const notes = browseTheme
+    ? sortNotes(notesInTheme(browseTheme, query))
+    : sortNotes(notesIn((query && browseSearchAll) ? null : browseFolder, query));
   $('browse-count').textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
   if (!notes.length) {
     list.appendChild(el('div', 'browse-empty', query ? 'No notes match your search.' : 'No notes here.'));
     return;
   }
 
-  // Group into buckets driven by the sort (date buckets, or first letter for Title).
   const queue = [];
+  const shown = new Set();   // hashes surfaced in Pinned/Recent, so they aren't repeated below
+
+  // Quick-access Pinned + Recent, only on the "home" view (no search / folder / theme).
+  if (!query && browseFolder == null && !browseTheme) {
+    const pins = pinnedHashes().map(noteByHash).filter(Boolean);
+    if (pins.length) {
+      queue.push({ header: 'Pinned' });
+      for (const n of pins) { queue.push({ note: n }); shown.add(n.hash); }
+    }
+    const recents = recentHashes().map(noteByHash).filter(n => n && !shown.has(n.hash)).slice(0, 6);
+    if (recents.length) {
+      queue.push({ header: 'Recent' });
+      for (const n of recents) { queue.push({ note: n }); shown.add(n.hash); }
+    }
+  }
+
+  // Main list, grouped into buckets driven by the sort (dates, or first letter for Title).
   let last = null;
   for (const n of notes) {
+    if (shown.has(n.hash)) continue;
     const b = bucketOf(n);
     if (b !== last) { queue.push({ header: b }); last = b; }
     queue.push({ note: n });
@@ -360,6 +432,14 @@ $('browse-search').addEventListener('input', e => {
   renderBrowse(e.target.value);
 });
 $('browse-sort').addEventListener('change', e => { browseSort = e.target.value; renderBrowse($('browse-search').value); });
+$('themes-toggle').addEventListener('click', () => {
+  themesOpen = !themesOpen;
+  const t = $('themes-toggle');
+  t.setAttribute('aria-expanded', String(themesOpen));
+  t.classList.toggle('open', themesOpen);
+  if (!themesOpen) browseTheme = null;   // collapsing clears the theme filter
+  renderBrowse($('browse-search').value);
+});
 $('open-browse').addEventListener('click', () => { renderBrowse($('browse-search').value); showScreen('screen-browse'); });
 $('float-merge').addEventListener('click', () => {
   const ns = [...selected].map(i => results[i]).filter(Boolean);
@@ -367,17 +447,40 @@ $('float-merge').addEventListener('click', () => {
 });
 
 // ── Read sheet ──
+let sheetHash = null;
+function updateSheetPin() {
+  const btn = $('sheet-pin');
+  btn.style.display = sheetHash ? '' : 'none';
+  const on = isPinned(sheetHash);
+  btn.textContent = on ? '★' : '☆';
+  btn.classList.toggle('on', on);
+  btn.title = on ? 'Unpin' : 'Pin';
+}
 function openReadSheet(note) {
   const full = note.body !== undefined && note._full === undefined ? note : fullNote(note);
   $('sheet-folder').textContent = full.folder || folderFromPath(full.path) || '';
   $('sheet-title').textContent = full.title || 'Untitled';
   $('sheet-meta').textContent = full.modified ? relativeTime(full.modified) : '';
   $('sheet-text').innerHTML = renderMarkdown(full.body || '(no body)');
+  sheetHash = full.hash || null;
+  updateSheetPin();
+  if (sheetHash) pushRecent(sheetHash);
   $('read-sheet').classList.add('open');
   if (hasManifest()) hydrateImages($('sheet-text'), cachedToken());
 }
-$('sheet-close').addEventListener('click', () => $('read-sheet').classList.remove('open'));
-$('read-sheet').addEventListener('click', e => { if (e.target.id === 'read-sheet') $('read-sheet').classList.remove('open'); });
+$('sheet-pin').addEventListener('click', () => {
+  if (!sheetHash) return;
+  togglePin(sheetHash);
+  updateSheetPin();
+  if ($('screen-browse').classList.contains('active')) renderBrowse($('browse-search').value);
+});
+function closeSheet() {
+  $('read-sheet').classList.remove('open');
+  // keep Browse's Recent/Pinned/stars current after viewing a note
+  if ($('screen-browse').classList.contains('active')) renderBrowse($('browse-search').value);
+}
+$('sheet-close').addEventListener('click', closeSheet);
+$('read-sheet').addEventListener('click', e => { if (e.target.id === 'read-sheet') closeSheet(); });
 
 // ── back buttons ──
 document.querySelectorAll('[data-back]').forEach(b =>

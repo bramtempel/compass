@@ -4,21 +4,24 @@
 function normPath(p) { return (p || '').replace(/\\/g, '/').toLowerCase(); }
 
 let _byPath = new Map();   // normalized path -> library note
+let _byHash = new Map();   // stable content hash -> library note (for pins/recents, D7)
 let _list = [];            // all notes, for Browse
 
 export function setLibrary(libraryData) {
   _byPath = new Map();
+  _byHash = new Map();
   _list = (libraryData && libraryData.notes) ? libraryData.notes : [];
-  for (const n of _list) _byPath.set(normPath(n.path), n);
+  for (const n of _list) { _byPath.set(normPath(n.path), n); if (n.hash) _byHash.set(n.hash, n); }
 }
 
 export function libraryCount() { return _list.length; }
 export function allNotes() { return _list; }
+export function noteByHash(hash) { return _byHash.get(hash) || null; }
 
 // Full note for a search-result/index note (by path). Falls back to the index note itself.
 export function fullNote(indexNote) {
   const hit = _byPath.get(normPath(indexNote.path));
-  if (hit) return { ...indexNote, body: hit.body, folder: hit.folder, created: hit.created, modified: hit.modified, _full: true };
+  if (hit) return { ...indexNote, hash: hit.hash, body: hit.body, folder: hit.folder, created: hit.created, modified: hit.modified, _full: true };
   return { ...indexNote, _full: false };
 }
 
