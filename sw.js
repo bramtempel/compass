@@ -1,11 +1,11 @@
-const CACHE = 'compass-v14';        // app shell (network-first; bumped per release)
+const CACHE = 'compass-v15';        // app shell (network-first; bumped per release)
 const ASSETS = 'compass-assets';   // heavy vendor runtime (cache-first; persists across releases)
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/app.js', './js/config.js', './js/db.js', './js/drive.js', './js/embed.js',
   './js/search.js', './js/library.js', './js/captures.js', './js/suggestions.js',
   './js/bespoke.js', './js/sync.js', './js/ui.js', './js/images.js', './js/merge.js',
-  './js/browse.js',
+  './js/browse.js', './js/labels.js',
 ];
 
 self.addEventListener('install', e => {

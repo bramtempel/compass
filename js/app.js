@@ -9,6 +9,7 @@ import { setLibrary, libraryCount, fullNote, allNotes, folders, notesIn, noteByH
 import { isPinned, togglePin, pinnedHashes, recentHashes, pushRecent } from './browse.js';
 import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, clearCaptures } from './captures.js';
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
+import { setLabels, labelFor } from './labels.js';
 import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
 import { setImageManifest, hasManifest, hydrate as hydrateImages } from './images.js';
@@ -25,6 +26,7 @@ function applyData(d) {
   index = d.index; vectors = d.vectors;
   setSuggestions(d.suggestions); setLibrary(d.library);
   setImageManifest(d.images); setImagesHosted(hasManifest());
+  setLabels(d.labels);
   buildThemes();
 }
 
@@ -256,8 +258,11 @@ const normP = p => (p || '').replace(/\\/g, '/').toLowerCase();
 function buildThemes() {
   themeByPath = new Map();
   themeList = [];
-  if (index && index.notes) for (const n of index.notes)
-    if (n.cluster_label) themeByPath.set(normP(n.path), n.cluster_label);
+  // Prefer the readable cluster name (cluster_labels.json); fall back to the raw keyword label.
+  if (index && index.notes) for (const n of index.notes) {
+    const lbl = labelFor(n.cluster_id) || n.cluster_label;
+    if (lbl) themeByPath.set(normP(n.path), lbl);
+  }
   const counts = new Map();
   for (const n of allNotes()) {
     const lbl = themeByPath.get(normP(n.path));
@@ -488,7 +493,7 @@ document.querySelectorAll('[data-back]').forEach(b =>
 
 // ── Settings ──
 const sFields = { 's-api-key': K.API_KEY, 's-worker-url': K.WORKER_URL, 's-library-id': K.LIBRARY_ID,
-  's-images-id': K.IMAGES_MANIFEST_ID,
+  's-images-id': K.IMAGES_MANIFEST_ID, 's-labels-id': K.LABELS_ID,
   's-index-id': K.INDEX_ID, 's-vectors-id': K.VECTORS_ID, 's-suggestions-id': K.SUGGESTIONS_ID,
   's-inbox-id': K.INBOX_ID, 's-client-id': K.CLIENT_ID };
 function openSettings() {

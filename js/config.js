@@ -11,6 +11,7 @@ export const K = {
   API_KEY:            'compass_api_key',
   WORKER_URL:         'compass_worker_url',
   IMAGES_MANIFEST_ID: 'compass_images_manifest_id', // images.json (basename->driveId)
+  LABELS_ID:          'compass_labels_id',           // cluster_labels.json (readable theme names)
 };
 
 const DEFAULTS = {
