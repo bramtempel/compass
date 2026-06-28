@@ -18,9 +18,10 @@ const DEFAULTS = {
   [K.INDEX_ID]:       '14yaaCo34DGG9y8g4hEOOMhnwYC7Svcg7',
   [K.VECTORS_ID]:     '1E_OVRCv3XA2ck5zvmqluyC2hjlxwVMIM',
   [K.SUGGESTIONS_ID]: '1MhHN8EVdBVSNubVbcBJURjya-1ddxh7d',
-  [K.LIBRARY_ID]:     '1n0DyGF5neSJOq0D7_IRFbX8Q7QPq9r-A',
-  [K.INBOX_ID]:       '1FDXJ26ilwm8f6NTVl8hOyrkKI9-tyowz',
-  [K.WORKER_URL]:     'https://snowy-frog-5917.bramtempelaere1.workers.dev',
+  [K.LIBRARY_ID]:         '1n0DyGF5neSJOq0D7_IRFbX8Q7QPq9r-A',
+  [K.IMAGES_MANIFEST_ID]: '1b87vIPmvhQp3-YvNXidlKs5GwKTJVqjg',
+  [K.INBOX_ID]:           '1FDXJ26ilwm8f6NTVl8hOyrkKI9-tyowz',
+  [K.WORKER_URL]:         'https://snowy-frog-5917.bramtempelaere1.workers.dev',
 };
 
 export function cfg(key, val) {
