@@ -1,4 +1,4 @@
-const CACHE = 'compass-v13';        // app shell (network-first; bumped per release)
+const CACHE = 'compass-v14';        // app shell (network-first; bumped per release)
 const ASSETS = 'compass-assets';   // heavy vendor runtime (cache-first; persists across releases)
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',

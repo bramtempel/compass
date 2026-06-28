@@ -145,8 +145,9 @@ body{
 .browse-sort:focus{border-color:var(--accent)}
 .themes-toggle{flex-shrink:0;background:var(--surface);border:1px solid var(--border);color:var(--text-2);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;padding:6px 10px;cursor:pointer}
 .themes-toggle.open{background:var(--accent-tint);border-color:var(--accent);color:var(--accent)}
-.browse-themes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.theme-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text-2);border-radius:100px;padding:5px 11px;font-size:12px;font-family:inherit;cursor:pointer}
+.browse-themes{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.browse-themes::-webkit-scrollbar{display:none}
+.theme-chip{flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-2);border-radius:100px;padding:5px 11px;font-size:12px;font-family:inherit;cursor:pointer}
 .theme-chip:hover{background:var(--surface2)}
 .theme-chip.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent)}
 .theme-chip .n{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
