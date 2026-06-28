@@ -22,9 +22,12 @@ function chunkText(text) {
 
 export async function loadModel(onProgress) {
   if (extractor) return;
-  const { pipeline, env } = await import(
-    'https://cdn.jsdelivr.net/npm/@xenova/transformers@2/dist/transformers.esm.min.js');
+  // Self-hosted engine — no CDN dependency (the CDN's transformers.esm.min.js 404s now).
+  const { pipeline, env } = await import('../vendor/transformers/transformers.js');
   env.allowLocalModels = false;
+  // Self-hosted ONNX runtime WASM (single-threaded SIMD build; GitHub Pages has no threads).
+  env.backends.onnx.wasm.wasmPaths = new URL('../vendor/transformers/', import.meta.url).href;
+  env.backends.onnx.wasm.numThreads = 1;
 
   // Aggregate per-file download progress into one overall number.
   const files = {};
