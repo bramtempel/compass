@@ -154,6 +154,28 @@ body{
 .theme-chip.active .n{color:var(--accent)}
 .themes-empty{font-size:12px;color:var(--muted);padding:4px 2px}
 .row-pin{color:var(--accent);font-size:12px}
+/* tags (chips reuse the theme-chip look) */
+.tag-chip{flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-2);border-radius:100px;padding:5px 11px;font-size:12px;font-family:inherit;cursor:pointer}
+.tag-chip:hover{background:var(--surface2)}
+.tag-chip.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent)}
+.tag-chip .n{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tag-chip.active .n{color:var(--accent)}
+.tag-chip.manage{color:var(--accent);border-style:dashed}
+.tags-empty{font-size:12px;color:var(--muted);padding:4px 2px}
+.browse-themes.wrap{flex-wrap:wrap;overflow:visible}
+.sheet-tags{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 4px}
+.note-tag{display:inline-flex;align-items:center;gap:5px;background:var(--accent-tint);color:var(--accent);border-radius:100px;padding:3px 10px;font-size:12px}
+.note-tag .x{background:none;border:none;color:var(--accent);font-size:14px;line-height:1;cursor:pointer;padding:0}
+.note-tag.add{background:none;border:1px dashed var(--border);color:var(--text-2);cursor:pointer;font-family:inherit}
+.sheet-short{max-height:70dvh}
+.sheet-head-title{font-size:14px;font-weight:600;color:var(--text)}
+.tag-new-row{display:flex;gap:8px;margin:4px 0 12px}
+.tag-new-row .search-input{flex:1}
+.tagmgr-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
+.tagmgr-row .t{flex:1;font-size:14px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tagmgr-row .c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tagmgr-actions{display:flex;gap:10px;flex-shrink:0}
+.link-btn.danger{color:#e0564b}
 .browse-group-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 2px}
 .browse-row{display:flex;flex-direction:column;gap:3px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;margin-bottom:6px}
 .browse-row:hover{background:var(--surface2)}

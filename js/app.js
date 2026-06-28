@@ -1,15 +1,16 @@
 // app.js — boots Compass and wires the modules together.
 
 import { K, cfg, isConfigured } from './config.js';
-import { idbDel } from './db.js';
-import { getAccessToken, driveUpload, cachedToken } from './drive.js';
+import { idbDel, idbSet } from './db.js';
+import { getAccessToken, driveUpload, driveUpdate, cachedToken } from './drive.js';
 import { loadModel, embedText, modelReady } from './embed.js';
 import { search } from './search.js';
 import { setLibrary, libraryCount, fullNote, allNotes, folders, notesIn, noteByHash } from './library.js';
 import { isPinned, togglePin, pinnedHashes, recentHashes, pushRecent } from './browse.js';
 import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, clearCaptures } from './captures.js';
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
-import { setLabels, labelFor } from './labels.js';
+import { setTags, setTagSaver, allTags, tagCounts, tagsOf, hasTag, addTag, removeTag,
+  createTag, deleteTag, renameTag, mergeTag } from './tags.js';
 import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
 import { setImageManifest, hasManifest, hydrate as hydrateImages } from './images.js';
@@ -26,9 +27,23 @@ function applyData(d) {
   index = d.index; vectors = d.vectors;
   setSuggestions(d.suggestions); setLibrary(d.library);
   setImageManifest(d.images); setImagesHosted(hasManifest());
-  setLabels(d.labels);
-  buildThemes();
+  adoptTags(d.tags);
 }
+
+// The phone owns tags.json locally once seeded — adopt the first copy we see (cache or the
+// initial Drive seed) and cache it; later background syncs never clobber local curation.
+let tagsLoaded = false;
+function adoptTags(t) {
+  if (tagsLoaded || !t) return;
+  setTags(t); tagsLoaded = true;
+  idbSet('tags', t).catch(() => {});
+}
+// Persist curation: cache is written synchronously by tags.js; this pushes to Drive (debounced).
+setTagSaver(async (data) => {
+  const id = cfg(K.TAGS_ID);
+  if (!id) return;                                   // not published yet -> stays local-only
+  try { await driveUpdate(id, JSON.stringify(data), await getAccessToken(false)); } catch {}
+});
 
 // ── splash / sync indicator ──
 const setSplash = (msg, pct) => { $('splash-msg').textContent = msg; if (pct != null) $('splash-fill').style.width = pct + '%'; };
@@ -244,50 +259,31 @@ function paintPassages(c, passages) {
 let browseFolder = null;        // null = All Notes
 let browseSort = 'modified';    // 'modified' | 'created' | 'title'
 let browseSearchAll = false;    // while searching: ignore the folder scope
-let browseTheme = null;         // active cluster label, or null
-let themesOpen = false;         // theme chip strip expanded?
+let browseTag = null;           // active tag filter, or null
+let tagsOpen = false;           // tag chip strip expanded?
 let browseObserver = null;      // incremental-reveal IntersectionObserver
 const BROWSE_CHUNK = 60;
 const DAY = 86400000;
 
-// Themes are read-only from the AI index (cluster_label, joined by path — D10/D12).
-let themeByPath = new Map();    // normalized path -> cluster_label
-let themeList = [];             // [{label, short, count}] substantial themes only
-const normP = p => (p || '').replace(/\\/g, '/').toLowerCase();
-
-function buildThemes() {
-  themeByPath = new Map();
-  themeList = [];
-  // Prefer the readable cluster name (cluster_labels.json); fall back to the raw keyword label.
-  if (index && index.notes) for (const n of index.notes) {
-    const lbl = labelFor(n.cluster_id) || n.cluster_label;
-    if (lbl) themeByPath.set(normP(n.path), lbl);
-  }
-  const counts = new Map();
-  for (const n of allNotes()) {
-    const lbl = themeByPath.get(normP(n.path));
-    if (lbl) counts.set(lbl, (counts.get(lbl) || 0) + 1);
-  }
-  themeList = [...counts.entries()]
-    .filter(([, c]) => c >= 3)                  // skip orphans / tiny clusters — too noisy
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, count]) => ({ label, count, short: label.split(' · ').slice(0, 2).join(' · ') }));
-}
-const themeOf = path => themeByPath.get(normP(path)) || null;
-function notesInTheme(label, q) {
+// Notes carrying a given tag, honouring the current search query.
+function notesWithTag(tag, q) {
   const t = (q || '').trim().toLowerCase();
-  return allNotes().filter(n => themeOf(n.path) === label &&
+  return allNotes().filter(n => hasTag(n.hash, tag) &&
     (!t || (n.title || '').toLowerCase().includes(t) || (n.body || '').toLowerCase().includes(t)));
 }
+
+const refreshBrowseIfActive = () => {
+  if ($('screen-browse').classList.contains('active')) renderBrowse($('browse-search').value);
+};
 
 function renderFolderChips() {
   const bar = $('browse-folders');
   bar.innerHTML = '';
   const mk = (name, count, value) => {
-    const c = el('button', 'folder-chip' + (browseFolder === value && !browseTheme ? ' active' : ''));
+    const c = el('button', 'folder-chip' + (browseFolder === value && !browseTag ? ' active' : ''));
     c.innerHTML = `${esc(name)} <span class="n">${count}</span>`;
     c.addEventListener('click', () => {
-      browseFolder = value; browseTheme = null; browseSearchAll = false;
+      browseFolder = value; browseTag = null; browseSearchAll = false;
       renderBrowse($('browse-search').value);
     });
     return c;
@@ -296,22 +292,26 @@ function renderFolderChips() {
   for (const f of folders()) bar.appendChild(mk(f.name, f.count, f.name));
 }
 
-function renderThemeChips() {
-  const bar = $('browse-themes');
-  bar.hidden = !themesOpen;
+function renderTagChips() {
+  const bar = $('browse-tags');
+  bar.hidden = !tagsOpen;
   bar.innerHTML = '';
-  if (!themesOpen) return;
-  if (!themeList.length) { bar.appendChild(el('div', 'themes-empty', 'No themes yet — sync your notes.')); return; }
-  for (const t of themeList) {
-    const c = el('button', 'theme-chip' + (browseTheme === t.label ? ' active' : ''));
-    c.title = t.label;
-    c.innerHTML = `${esc(t.short)} <span class="n">${t.count}</span>`;
+  if (!tagsOpen) return;
+  const counts = tagCounts();
+  const list = allTags();
+  if (!list.length) bar.appendChild(el('div', 'tags-empty', 'No tags yet — seed them with generate_tags.py.'));
+  for (const t of list) {
+    const c = el('button', 'tag-chip' + (browseTag === t ? ' active' : ''));
+    c.innerHTML = `${esc(t)} <span class="n">${counts.get(t) || 0}</span>`;
     c.addEventListener('click', () => {
-      browseTheme = (browseTheme === t.label) ? null : t.label;   // toggle off if re-clicked
+      browseTag = (browseTag === t) ? null : t;   // toggle off if re-clicked
       renderBrowse($('browse-search').value);
     });
     bar.appendChild(c);
   }
+  const manage = el('button', 'tag-chip manage', '⚙ Manage');
+  manage.addEventListener('click', openTagManager);
+  bar.appendChild(manage);
 }
 
 // Bucket a note for the current sort: date buckets for date sorts, first letter for title.
@@ -367,14 +367,14 @@ function renderScopeHint(query) {
 
 function renderBrowse(query = '') {
   renderFolderChips();
-  renderThemeChips();
+  renderTagChips();
   renderScopeHint(query);
   const list = $('browse-list');
   list.innerHTML = '';
   if (browseObserver) { browseObserver.disconnect(); browseObserver = null; }
 
-  const notes = browseTheme
-    ? sortNotes(notesInTheme(browseTheme, query))
+  const notes = browseTag
+    ? sortNotes(notesWithTag(browseTag, query))
     : sortNotes(notesIn((query && browseSearchAll) ? null : browseFolder, query));
   $('browse-count').textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
   if (!notes.length) {
@@ -385,8 +385,8 @@ function renderBrowse(query = '') {
   const queue = [];
   const shown = new Set();   // hashes surfaced in Pinned/Recent, so they aren't repeated below
 
-  // Quick-access Pinned + Recent, only on the "home" view (no search / folder / theme).
-  if (!query && browseFolder == null && !browseTheme) {
+  // Quick-access Pinned + Recent, only on the "home" view (no search / folder / tag).
+  if (!query && browseFolder == null && !browseTag) {
     const pins = pinnedHashes().map(noteByHash).filter(Boolean);
     if (pins.length) {
       queue.push({ header: 'Pinned' });
@@ -437,12 +437,12 @@ $('browse-search').addEventListener('input', e => {
   renderBrowse(e.target.value);
 });
 $('browse-sort').addEventListener('change', e => { browseSort = e.target.value; renderBrowse($('browse-search').value); });
-$('themes-toggle').addEventListener('click', () => {
-  themesOpen = !themesOpen;
-  const t = $('themes-toggle');
-  t.setAttribute('aria-expanded', String(themesOpen));
-  t.classList.toggle('open', themesOpen);
-  if (!themesOpen) browseTheme = null;   // collapsing clears the theme filter
+$('tags-toggle').addEventListener('click', () => {
+  tagsOpen = !tagsOpen;
+  const t = $('tags-toggle');
+  t.setAttribute('aria-expanded', String(tagsOpen));
+  t.classList.toggle('open', tagsOpen);
+  if (!tagsOpen) browseTag = null;   // collapsing clears the tag filter
   renderBrowse($('browse-search').value);
 });
 $('open-browse').addEventListener('click', () => { renderBrowse($('browse-search').value); showScreen('screen-browse'); });
@@ -469,6 +469,7 @@ function openReadSheet(note) {
   $('sheet-text').innerHTML = renderMarkdown(full.body || '(no body)');
   sheetHash = full.hash || null;
   updateSheetPin();
+  renderSheetTags();
   if (sheetHash) pushRecent(sheetHash);
   $('read-sheet').classList.add('open');
   if (hasManifest()) hydrateImages($('sheet-text'), cachedToken());
@@ -477,8 +478,83 @@ $('sheet-pin').addEventListener('click', () => {
   if (!sheetHash) return;
   togglePin(sheetHash);
   updateSheetPin();
-  if ($('screen-browse').classList.contains('active')) renderBrowse($('browse-search').value);
+  refreshBrowseIfActive();
 });
+
+// ── note tags (read sheet) ──
+function renderSheetTags() {
+  const box = $('sheet-tags');
+  box.innerHTML = '';
+  if (!sheetHash) return;
+  for (const t of tagsOf(sheetHash)) {
+    const chip = el('span', 'note-tag');
+    chip.innerHTML = `${esc(t)} <button class="x" title="Remove tag">×</button>`;
+    chip.querySelector('.x').addEventListener('click', () => { removeTag(sheetHash, t); renderSheetTags(); refreshBrowseIfActive(); });
+    box.appendChild(chip);
+  }
+  const add = el('button', 'note-tag add', '+ tag');
+  add.addEventListener('click', openTagPicker);
+  box.appendChild(add);
+}
+
+// Pick/toggle tags for the open note, or create a new one.
+function openTagPicker() {
+  if (!sheetHash) return;
+  const box = $('tagpick-list');
+  box.innerHTML = '';
+  const counts = tagCounts();
+  const list = allTags();
+  if (!list.length) box.appendChild(el('div', 'tags-empty', 'No tags yet — create one below.'));
+  for (const t of list) {
+    const chip = el('button', 'tag-chip' + (hasTag(sheetHash, t) ? ' active' : ''));
+    chip.innerHTML = `${esc(t)} <span class="n">${counts.get(t) || 0}</span>`;
+    chip.addEventListener('click', () => {
+      hasTag(sheetHash, t) ? removeTag(sheetHash, t) : addTag(sheetHash, t);
+      openTagPicker(); renderSheetTags(); refreshBrowseIfActive();
+    });
+    box.appendChild(chip);
+  }
+  $('tagpick-new').value = '';
+  $('tag-picker').classList.add('open');
+}
+function addNewTagFromPicker() {
+  const v = $('tagpick-new').value.trim();
+  if (!v || !sheetHash) return;
+  createTag(v); addTag(sheetHash, v);
+  openTagPicker(); renderSheetTags(); refreshBrowseIfActive();
+}
+$('tagpick-add').addEventListener('click', addNewTagFromPicker);
+$('tagpick-new').addEventListener('keydown', e => { if (e.key === 'Enter') addNewTagFromPicker(); });
+$('tagpick-close').addEventListener('click', () => $('tag-picker').classList.remove('open'));
+$('tag-picker').addEventListener('click', e => { if (e.target.id === 'tag-picker') $('tag-picker').classList.remove('open'); });
+
+// Curate the whole tag list: rename / merge / delete / create.
+function openTagManager() {
+  const box = $('tagmgr-list');
+  box.innerHTML = '';
+  const counts = tagCounts();
+  const list = allTags();
+  if (!list.length) box.appendChild(el('div', 'tags-empty', 'No tags yet.'));
+  for (const t of list) {
+    const row = el('div', 'tagmgr-row');
+    row.innerHTML = `<span class="t">${esc(t)}</span><span class="c">${counts.get(t) || 0}</span>`;
+    const acts = el('div', 'tagmgr-actions');
+    const mk = (label, cls, fn) => { const b = el('button', 'link-btn' + (cls ? ' ' + cls : ''), label); b.addEventListener('click', fn); return b; };
+    acts.append(
+      mk('rename', '', () => { const nw = prompt(`Rename "${t}" to:`, t); if (nw && nw.trim()) { renameTag(t, nw); openTagManager(); refreshBrowseIfActive(); } }),
+      mk('merge', '', () => { const into = prompt(`Merge "${t}" into which tag?`); if (into && into.trim()) { mergeTag(t, into); openTagManager(); refreshBrowseIfActive(); } }),
+      mk('delete', 'danger', () => { if (confirm(`Delete tag "${t}" from all notes?`)) { deleteTag(t); openTagManager(); refreshBrowseIfActive(); } }),
+    );
+    row.appendChild(acts);
+    box.appendChild(row);
+  }
+  $('tagmgr-new').value = '';
+  $('tag-manager').classList.add('open');
+}
+$('tagmgr-add').addEventListener('click', () => { const v = $('tagmgr-new').value.trim(); if (v) { createTag(v); openTagManager(); } });
+$('tagmgr-new').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) { createTag(v); openTagManager(); } } });
+$('tagmgr-close').addEventListener('click', () => $('tag-manager').classList.remove('open'));
+$('tag-manager').addEventListener('click', e => { if (e.target.id === 'tag-manager') $('tag-manager').classList.remove('open'); });
 function closeSheet() {
   $('read-sheet').classList.remove('open');
   // keep Browse's Recent/Pinned/stars current after viewing a note
@@ -493,7 +569,7 @@ document.querySelectorAll('[data-back]').forEach(b =>
 
 // ── Settings ──
 const sFields = { 's-api-key': K.API_KEY, 's-worker-url': K.WORKER_URL, 's-library-id': K.LIBRARY_ID,
-  's-images-id': K.IMAGES_MANIFEST_ID, 's-labels-id': K.LABELS_ID,
+  's-images-id': K.IMAGES_MANIFEST_ID, 's-labels-id': K.LABELS_ID, 's-tags-id': K.TAGS_ID,
   's-index-id': K.INDEX_ID, 's-vectors-id': K.VECTORS_ID, 's-suggestions-id': K.SUGGESTIONS_ID,
   's-inbox-id': K.INBOX_ID, 's-client-id': K.CLIENT_ID };
 function openSettings() {

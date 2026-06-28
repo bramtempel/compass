@@ -12,6 +12,7 @@ export const K = {
   WORKER_URL:         'compass_worker_url',
   IMAGES_MANIFEST_ID: 'compass_images_manifest_id', // images.json (basename->driveId)
   LABELS_ID:          'compass_labels_id',           // cluster_labels.json (readable theme names)
+  TAGS_ID:            'compass_tags_id',              // tags.json (curated tags; phone-writable)
 };
 
 const DEFAULTS = {

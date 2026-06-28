@@ -92,14 +92,14 @@
         <div class="browse-folders" id="browse-folders"></div>
         <div class="browse-controls">
           <span class="browse-scope" id="browse-scope"></span>
-          <button class="themes-toggle" id="themes-toggle" aria-expanded="false">Themes</button>
+          <button class="themes-toggle" id="tags-toggle" aria-expanded="false">Tags</button>
           <select class="browse-sort" id="browse-sort" aria-label="Sort notes">
             <option value="modified">Recently updated</option>
             <option value="created">Recently created</option>
             <option value="title">Title A–Z</option>
           </select>
         </div>
-        <div class="browse-themes" id="browse-themes" hidden></div>
+        <div class="browse-themes" id="browse-tags" hidden></div>
       </div>
       <div id="browse-list"></div>
     </div>
@@ -118,7 +118,38 @@
     <div class="sheet-body">
       <div class="sheet-title" id="sheet-title"></div>
       <div class="sheet-meta" id="sheet-meta"></div>
+      <div class="sheet-tags" id="sheet-tags"></div>
       <div class="sheet-text" id="sheet-text"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAG PICKER (per-note) -->
+<div class="sheet-overlay" id="tag-picker">
+  <div class="sheet sheet-short">
+    <div class="sheet-head"><span class="sheet-head-title">Tags for this note</span>
+      <button class="sheet-close" id="tagpick-close">×</button></div>
+    <div class="sheet-body">
+      <div class="browse-themes wrap" id="tagpick-list"></div>
+      <div class="tag-new-row">
+        <input class="search-input" id="tagpick-new" placeholder="New tag…">
+        <button class="btn-secondary" id="tagpick-add">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAG MANAGER (curate the list) -->
+<div class="sheet-overlay" id="tag-manager">
+  <div class="sheet">
+    <div class="sheet-head"><span class="sheet-head-title">Manage tags</span>
+      <button class="sheet-close" id="tagmgr-close">×</button></div>
+    <div class="sheet-body">
+      <div class="tag-new-row">
+        <input class="search-input" id="tagmgr-new" placeholder="Create a tag…">
+        <button class="btn-secondary" id="tagmgr-add">Create</button>
+      </div>
+      <div id="tagmgr-list"></div>
     </div>
   </div>
 </div>
@@ -158,6 +189,7 @@
     <div><label>vectors.bin file ID</label><input type="text" id="s-vectors-id"></div>
     <div><label>suggestions.json file ID</label><input type="text" id="s-suggestions-id"></div>
     <div><label>cluster_labels.json file ID <span class="field-hint">(run label_clusters.py)</span></label><input type="text" id="s-labels-id"></div>
+    <div><label>tags.json file ID <span class="field-hint">(run generate_tags.py --publish)</span></label><input type="text" id="s-tags-id"></div>
     <div><label>inbox/ folder ID</label><input type="text" id="s-inbox-id"></div>
     <div><label>Google OAuth Client ID</label><input type="text" id="s-client-id"></div>
     <div class="row">

@@ -7,16 +7,16 @@ import { driveDownload } from './drive.js';
 import { decodeF16 } from './search.js';
 
 export async function loadCached() {
-  const [index, vecBuf, suggestions, library, images, labels] = await Promise.all([
-    idbGet('index'), idbGet('vectors_buf'), idbGet('suggestions'), idbGet('library'), idbGet('images'), idbGet('labels')]);
+  const [index, vecBuf, suggestions, library, images, labels, tags] = await Promise.all([
+    idbGet('index'), idbGet('vectors_buf'), idbGet('suggestions'), idbGet('library'), idbGet('images'), idbGet('labels'), idbGet('tags')]);
   if (!index || !vecBuf) return null;
-  return { index, vectors: decodeF16(vecBuf), suggestions, library, images, labels };
+  return { index, vectors: decodeF16(vecBuf), suggestions, library, images, labels, tags };
 }
 
 export async function syncFromDrive(token, onProgress = () => {}) {
   const indexId = cfg(K.INDEX_ID), vectorsId = cfg(K.VECTORS_ID);
   const suggId = cfg(K.SUGGESTIONS_ID), libId = cfg(K.LIBRARY_ID), imgId = cfg(K.IMAGES_MANIFEST_ID);
-  const labelsId = cfg(K.LABELS_ID);
+  const labelsId = cfg(K.LABELS_ID), tagsId = cfg(K.TAGS_ID);
   if (!indexId || !vectorsId) throw new Error('Drive file IDs not configured.');
 
   onProgress('index', 20);
@@ -29,7 +29,9 @@ export async function syncFromDrive(token, onProgress = () => {}) {
   if (suggId) { onProgress('suggestions', 60); try { suggestions = await (await driveDownload(suggId, token)).json(); } catch {} }
   if (libId)  { onProgress('library', 78);     try { library = await (await driveDownload(libId, token)).json(); } catch {} }
   if (imgId)  { onProgress('images', 88);      try { images = await (await driveDownload(imgId, token)).json(); } catch {} }
-  if (labelsId) { onProgress('themes', 92);    try { labels = await (await driveDownload(labelsId, token)).json(); } catch {} }
+  if (labelsId) { onProgress('themes', 90);    try { labels = await (await driveDownload(labelsId, token)).json(); } catch {} }
+  let tags = null;
+  if (tagsId) { onProgress('tags', 93);        try { tags = await (await driveDownload(tagsId, token)).json(); } catch {} }
 
   onProgress('cache', 95);
   await idbSet('index', index);
@@ -38,6 +40,7 @@ export async function syncFromDrive(token, onProgress = () => {}) {
   if (library) await idbSet('library', library);
   if (images) await idbSet('images', images);
   if (labels) await idbSet('labels', labels);
+  // NOTE: do NOT cache tags here — the phone owns tags.json locally once seeded (see app.js).
 
-  return { index, vectors: decodeF16(vecBuf), suggestions, library, images, labels };
+  return { index, vectors: decodeF16(vecBuf), suggestions, library, images, labels, tags };
 }

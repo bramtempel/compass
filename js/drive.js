@@ -53,3 +53,11 @@ export async function driveUpload(name, folderId, content, token) {
   if (!r.ok) throw new Error(`Drive upload failed (${r.status})`);
   return r.json();
 }
+
+// Overwrite an existing Drive file's contents, keeping its ID (single-writer artifacts).
+export async function driveUpdate(fileId, content, token, mime = 'application/json') {
+  const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': mime }, body: content });
+  if (!r.ok) throw new Error(`Drive update failed (${r.status})`);
+  return r.json();
+}
