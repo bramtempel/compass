@@ -358,7 +358,13 @@ async function enterApp() {
 
 // ── boot ──
 async function boot() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return; reloaded = true; location.reload();   // new SW took over -> load fresh
+    });
+  }
   initMerge();
   loadModelFlow();                       // start the ~120MB model download immediately, in parallel
   setSplash('Loading cached notes…', 15);
