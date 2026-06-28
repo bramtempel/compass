@@ -12,6 +12,27 @@ export function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Escape text and wrap case-insensitive matches of `q` in <mark>. Splits the RAW text so
+// HTML-escaping never interferes with matching; returns safe HTML.
+export function highlight(text, q) {
+  const s = String(text ?? '');
+  const t = (q || '').trim();
+  if (!t) return esc(s);
+  const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+  return s.split(re).map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part))).join('');
+}
+
+// Plain-text snippet; when `q` matches, window around the first hit so the match is visible.
+export function snippet(body, q, len = 160) {
+  const s = String(body ?? '').replace(/\s+/g, ' ').trim();
+  const t = (q || '').trim();
+  if (!t) return s.slice(0, len);
+  const idx = s.toLowerCase().indexOf(t.toLowerCase());
+  if (idx < 0) return s.slice(0, len);
+  const start = Math.max(0, idx - 40);
+  return (start > 0 ? '… ' : '') + s.slice(start, start + len);
+}
+
 export function folderFromPath(path) {
   const parts = (path || '').replace(/\\/g, '/').split('/');
   return parts.length >= 2 ? parts[parts.length - 2] : '';

@@ -12,7 +12,7 @@ import { getBespoke } from './bespoke.js';
 import { loadCached, syncFromDrive } from './sync.js';
 import { setImageManifest, hasManifest, hydrate as hydrateImages } from './images.js';
 import { initMerge, openMerge } from './merge.js';
-import { $, el, esc, showScreen, renderMarkdown, setImagesHosted, folderFromPath, relativeTime } from './ui.js';
+import { $, el, esc, showScreen, renderMarkdown, setImagesHosted, folderFromPath, relativeTime, highlight, snippet } from './ui.js';
 
 // ── state ──
 let index = null;        // index.json
@@ -238,8 +238,11 @@ function paintPassages(c, passages) {
 
 // ── Browse screen ──
 let browseFolder = null;        // null = All Notes
+let browseSort = 'modified';    // 'modified' | 'created' | 'title'
+let browseSearchAll = false;    // while searching: ignore the folder scope
 let browseObserver = null;      // incremental-reveal IntersectionObserver
 const BROWSE_CHUNK = 60;
+const DAY = 86400000;
 
 function renderFolderChips() {
   const bar = $('browse-folders');
@@ -247,48 +250,85 @@ function renderFolderChips() {
   const mk = (name, count, value) => {
     const c = el('button', 'folder-chip' + (browseFolder === value ? ' active' : ''));
     c.innerHTML = `${esc(name)} <span class="n">${count}</span>`;
-    c.addEventListener('click', () => { browseFolder = value; renderBrowse($('browse-search').value); });
+    c.addEventListener('click', () => { browseFolder = value; browseSearchAll = false; renderBrowse($('browse-search').value); });
     return c;
   };
   bar.appendChild(mk('All Notes', allNotes().length, null));
   for (const f of folders()) bar.appendChild(mk(f.name, f.count, f.name));
 }
 
-function browseRow(n) {
+// Bucket a note for the current sort: date buckets for date sorts, first letter for title.
+function bucketOf(n) {
+  if (browseSort === 'title') {
+    const ch = (n.title || '').trim().charAt(0).toUpperCase();
+    return /[A-Z]/.test(ch) ? ch : '#';
+  }
+  const t = Date.parse(browseSort === 'created' ? n.created : n.modified);
+  if (isNaN(t)) return 'Undated';
+  const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+  const d = Math.floor((startToday.getTime() - t) / DAY);
+  if (d <= 0) return 'Today';
+  if (d === 1) return 'Yesterday';
+  if (d <= 7) return 'Previous 7 days';
+  if (d <= 30) return 'Previous 30 days';
+  return 'Older';
+}
+
+function sortNotes(list) {
+  const key = browseSort === 'created' ? 'created' : 'modified';
+  return [...list].sort((a, b) =>
+    browseSort === 'title'
+      ? (a.title || '').localeCompare(b.title || '')
+      : (Date.parse(b[key]) || 0) - (Date.parse(a[key]) || 0));
+}
+
+function browseRow(n, query) {
   const row = el('div', 'browse-row');
-  const date = relativeTime(n.modified);
+  const date = relativeTime(browseSort === 'created' ? n.created : n.modified);
   row.innerHTML =
-    `<div class="browse-row-top"><span class="t">${esc(n.title)}</span>` +
+    `<div class="browse-row-top"><span class="t">${highlight(n.title, query)}</span>` +
     (date ? `<span class="d">${esc(date)}</span>` : '') + '</div>' +
-    `<span class="s">${esc((n.body || '').slice(0, 140))}</span>`;
+    `<span class="s">${highlight(snippet(n.body, query), query)}</span>` +
+    (n.folder ? `<div class="browse-row-foot"><span class="folder-tag">${esc(n.folder)}</span></div>` : '');
   row.addEventListener('click', () => openReadSheet(n));
   return row;
 }
 
+// Scope hint: while searching inside a folder, offer to widen to all notes (and back).
+function renderScopeHint(query) {
+  const hint = $('browse-scope');
+  if (!query || !browseFolder) { hint.textContent = ''; return; }
+  if (browseSearchAll) {
+    hint.innerHTML = `All notes · <button class="link-btn" id="scope-folder">only ${esc(browseFolder)}</button>`;
+    $('scope-folder').addEventListener('click', () => { browseSearchAll = false; renderBrowse(query); });
+  } else {
+    hint.innerHTML = `In <b>${esc(browseFolder)}</b> · <button class="link-btn" id="scope-all">search all notes</button>`;
+    $('scope-all').addEventListener('click', () => { browseSearchAll = true; renderBrowse(query); });
+  }
+}
+
 function renderBrowse(query = '') {
   renderFolderChips();
+  renderScopeHint(query);
   const list = $('browse-list');
   list.innerHTML = '';
   if (browseObserver) { browseObserver.disconnect(); browseObserver = null; }
 
-  const notes = notesIn(browseFolder, query);
+  const scopeFolder = (query && browseSearchAll) ? null : browseFolder;
+  const notes = sortNotes(notesIn(scopeFolder, query));
   $('browse-count').textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
   if (!notes.length) {
     list.appendChild(el('div', 'browse-empty', query ? 'No notes match your search.' : 'No notes here.'));
     return;
   }
 
-  // Flat render queue: group headers only in All Notes (folder views are already scoped).
+  // Group into buckets driven by the sort (date buckets, or first letter for Title).
   const queue = [];
-  if (browseFolder == null) {
-    const groups = {};
-    for (const n of notes) (groups[n.folder || 'Other'] ??= []).push(n);
-    for (const folder of Object.keys(groups).sort()) {
-      queue.push({ header: folder });
-      for (const n of groups[folder]) queue.push({ note: n });
-    }
-  } else {
-    for (const n of notes) queue.push({ note: n });
+  let last = null;
+  for (const n of notes) {
+    const b = bucketOf(n);
+    if (b !== last) { queue.push({ header: b }); last = b; }
+    queue.push({ note: n });
   }
 
   // Reveal in chunks as the sentinel scrolls into view — keeps 764+ notes smooth.
@@ -300,7 +340,7 @@ function renderBrowse(query = '') {
     while (i < queue.length && added < BROWSE_CHUNK) {
       const item = queue[i++];
       if (item.header) frag.appendChild(el('div', 'browse-group-label', item.header));
-      else { frag.appendChild(browseRow(item.note)); added++; }
+      else { frag.appendChild(browseRow(item.note, query)); added++; }
     }
     list.insertBefore(frag, sentinel);
     if (i >= queue.length) {
@@ -315,7 +355,11 @@ function renderBrowse(query = '') {
   browseObserver.observe(sentinel);
   renderChunk();
 }
-$('browse-search').addEventListener('input', e => renderBrowse(e.target.value));
+$('browse-search').addEventListener('input', e => {
+  if (!e.target.value.trim()) browseSearchAll = false;   // reset widen-scope when search clears
+  renderBrowse(e.target.value);
+});
+$('browse-sort').addEventListener('change', e => { browseSort = e.target.value; renderBrowse($('browse-search').value); });
 $('open-browse').addEventListener('click', () => { renderBrowse($('browse-search').value); showScreen('screen-browse'); });
 $('float-merge').addEventListener('click', () => {
   const ns = [...selected].map(i => results[i]).filter(Boolean);

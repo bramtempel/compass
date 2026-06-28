@@ -90,6 +90,14 @@
       <div class="browse-header">
         <div class="search-box"><input class="search-input" id="browse-search" placeholder="Search all notes…"></div>
         <div class="browse-folders" id="browse-folders"></div>
+        <div class="browse-controls">
+          <span class="browse-scope" id="browse-scope"></span>
+          <select class="browse-sort" id="browse-sort" aria-label="Sort notes">
+            <option value="modified">Recently updated</option>
+            <option value="created">Recently created</option>
+            <option value="title">Title A–Z</option>
+          </select>
+        </div>
       </div>
       <div id="browse-list"></div>
     </div>
