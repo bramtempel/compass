@@ -419,10 +419,20 @@ async function enterApp() {
 // ── boot ──
 async function boot() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // Whether a SW already controls this page (false on a first-ever load / after a cache clear).
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+      // Actively check for a new SW: on boot, whenever the tab regains focus, and hourly —
+      // so a long-open or installed PWA picks up deploys without a manual cache clear.
+      const check = () => reg.update().catch(() => {});
+      check();
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      setInterval(check, 60 * 60 * 1000);
+    }).catch(() => {});
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloaded) return; reloaded = true; location.reload();   // new SW took over -> load fresh
+      if (reloaded || !hadController) return;   // skip the one-time claim on a fresh load
+      reloaded = true; location.reload();        // a new SW took over -> run fresh code
     });
   }
   initMerge();

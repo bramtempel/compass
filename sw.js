@@ -1,4 +1,4 @@
-const CACHE = 'compass-v10';        // app shell (network-first; bumped per release)
+const CACHE = 'compass-v11';        // app shell (network-first; bumped per release)
 const ASSETS = 'compass-assets';   // heavy vendor runtime (cache-first; persists across releases)
 const SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
@@ -8,7 +8,11 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {}));
+  // Precache fresh from the network (bypass the HTTP cache) so a new shell never
+  // installs stale files.
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'no-store' }))))
+    .catch(() => {}));
   self.skipWaiting();
 });
 
@@ -36,8 +40,9 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // App shell: network-first (fresh code online), cache fallback offline.
-  e.respondWith(fetch(e.request).then(resp => {
+  // App shell: network-first, TRULY fresh — bypass the browser HTTP cache so a deploy
+  // is picked up on the next load. Cache fallback when offline.
+  e.respondWith(fetch(e.request, { cache: 'no-store' }).then(resp => {
     const copy = resp.clone();
     caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
     return resp;
