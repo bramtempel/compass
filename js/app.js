@@ -5,7 +5,7 @@ import { idbDel } from './db.js';
 import { getAccessToken, driveUpload, cachedToken } from './drive.js';
 import { loadModel, embedText, modelReady } from './embed.js';
 import { search } from './search.js';
-import { setLibrary, libraryCount, fullNote, filterNotes } from './library.js';
+import { setLibrary, libraryCount, fullNote, allNotes, folders, notesIn } from './library.js';
 import { loadCaptures, addCapture, searchCaptures, recent, count as capCount, clearCaptures } from './captures.js';
 import { setSuggestions, suggestionFor, getCachedBespoke, setCachedBespoke } from './suggestions.js';
 import { getBespoke } from './bespoke.js';
@@ -237,23 +237,83 @@ function paintPassages(c, passages) {
 }
 
 // ── Browse screen ──
+let browseFolder = null;        // null = All Notes
+let browseObserver = null;      // incremental-reveal IntersectionObserver
+const BROWSE_CHUNK = 60;
+
+function renderFolderChips() {
+  const bar = $('browse-folders');
+  bar.innerHTML = '';
+  const mk = (name, count, value) => {
+    const c = el('button', 'folder-chip' + (browseFolder === value ? ' active' : ''));
+    c.innerHTML = `${esc(name)} <span class="n">${count}</span>`;
+    c.addEventListener('click', () => { browseFolder = value; renderBrowse($('browse-search').value); });
+    return c;
+  };
+  bar.appendChild(mk('All Notes', allNotes().length, null));
+  for (const f of folders()) bar.appendChild(mk(f.name, f.count, f.name));
+}
+
+function browseRow(n) {
+  const row = el('div', 'browse-row');
+  const date = relativeTime(n.modified);
+  row.innerHTML =
+    `<div class="browse-row-top"><span class="t">${esc(n.title)}</span>` +
+    (date ? `<span class="d">${esc(date)}</span>` : '') + '</div>' +
+    `<span class="s">${esc((n.body || '').slice(0, 140))}</span>`;
+  row.addEventListener('click', () => openReadSheet(n));
+  return row;
+}
+
 function renderBrowse(query = '') {
+  renderFolderChips();
   const list = $('browse-list');
   list.innerHTML = '';
-  const notes = filterNotes(query);
-  $('browse-count').textContent = `${notes.length} notes`;
-  // group by folder
-  const groups = {};
-  for (const n of notes) (groups[n.folder || 'Other'] ??= []).push(n);
-  for (const folder of Object.keys(groups).sort()) {
-    list.appendChild(el('div', 'browse-group-label', folder || 'Other'));
-    for (const n of groups[folder].slice(0, query ? 9999 : 200)) {
-      const row = el('div', 'browse-row');
-      row.innerHTML = `<span class="t">${esc(n.title)}</span><span class="s">${esc((n.body || '').slice(0, 120))}</span>`;
-      row.addEventListener('click', () => openReadSheet(n));
-      list.appendChild(row);
-    }
+  if (browseObserver) { browseObserver.disconnect(); browseObserver = null; }
+
+  const notes = notesIn(browseFolder, query);
+  $('browse-count').textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
+  if (!notes.length) {
+    list.appendChild(el('div', 'browse-empty', query ? 'No notes match your search.' : 'No notes here.'));
+    return;
   }
+
+  // Flat render queue: group headers only in All Notes (folder views are already scoped).
+  const queue = [];
+  if (browseFolder == null) {
+    const groups = {};
+    for (const n of notes) (groups[n.folder || 'Other'] ??= []).push(n);
+    for (const folder of Object.keys(groups).sort()) {
+      queue.push({ header: folder });
+      for (const n of groups[folder]) queue.push({ note: n });
+    }
+  } else {
+    for (const n of notes) queue.push({ note: n });
+  }
+
+  // Reveal in chunks as the sentinel scrolls into view — keeps 764+ notes smooth.
+  let i = 0;
+  const sentinel = el('div', 'browse-sentinel');
+  const renderChunk = () => {
+    const frag = document.createDocumentFragment();
+    let added = 0;
+    while (i < queue.length && added < BROWSE_CHUNK) {
+      const item = queue[i++];
+      if (item.header) frag.appendChild(el('div', 'browse-group-label', item.header));
+      else { frag.appendChild(browseRow(item.note)); added++; }
+    }
+    list.insertBefore(frag, sentinel);
+    if (i >= queue.length) {
+      if (browseObserver) { browseObserver.disconnect(); browseObserver = null; }
+      sentinel.remove();
+    }
+  };
+  list.appendChild(sentinel);
+  browseObserver = new IntersectionObserver(
+    entries => { if (entries.some(e => e.isIntersecting)) renderChunk(); },
+    { rootMargin: '300px' });
+  browseObserver.observe(sentinel);
+  renderChunk();
 }
 $('browse-search').addEventListener('input', e => renderBrowse(e.target.value));
 $('open-browse').addEventListener('click', () => { renderBrowse($('browse-search').value); showScreen('screen-browse'); });

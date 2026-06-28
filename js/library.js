@@ -34,3 +34,24 @@ export function filterNotes(q) {
   return _list.filter(n =>
     (n.title || '').toLowerCase().includes(t) || (n.body || '').toLowerCase().includes(t));
 }
+
+// Folders with note counts, alphabetical — for Browse navigation ("All Notes" is the caller's job).
+export function folders() {
+  const counts = new Map();
+  for (const n of _list) {
+    const f = n.folder || 'Other';
+    counts.set(f, (counts.get(f) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, count]) => ({ name, count }));
+}
+
+// Notes scoped to a folder (null/'' = all), optionally text-filtered. No cap.
+export function notesIn(folder, q) {
+  let list = folder ? _list.filter(n => (n.folder || 'Other') === folder) : _list;
+  const t = (q || '').trim().toLowerCase();
+  if (t) list = list.filter(n =>
+    (n.title || '').toLowerCase().includes(t) || (n.body || '').toLowerCase().includes(t));
+  return list;
+}

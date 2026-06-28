@@ -126,15 +126,28 @@ body{
 .bespoke-excerpt{font-size:14px;line-height:1.6;color:var(--text-2);font-style:italic;border-left:2px solid var(--border);padding-left:10px}
 
 /* ── Browse ── */
-.search-box{position:sticky;top:0;background:var(--bg);padding-bottom:10px;z-index:5}
+.browse-header{position:sticky;top:0;background:var(--bg);z-index:5;padding-bottom:8px}
+.search-box{padding-bottom:8px}
 .search-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;padding:11px 13px;outline:none;font-family:inherit}
 .search-input:focus{border-color:var(--accent)}
+.browse-folders{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+.browse-folders::-webkit-scrollbar{display:none}
+.folder-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-2);border-radius:100px;padding:6px 12px;font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap}
+.folder-chip:hover{background:var(--surface2)}
+.folder-chip.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent)}
+.folder-chip .n{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.folder-chip.active .n{color:var(--accent)}
 .browse-group-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 2px}
 .browse-row{display:flex;flex-direction:column;gap:3px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;margin-bottom:6px}
 .browse-row:hover{background:var(--surface2)}
+.browse-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.browse-row-top .t{flex:1;min-width:0}
 .browse-row .t{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.browse-row .d{font-size:11px;color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
 .browse-row .s{font-size:12px;color:var(--text-2);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .browse-count{font-size:12px;color:var(--muted)}
+.browse-empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px}
+.browse-sentinel{height:1px}
 
 /* ── Read sheet (slide-up) ── */
 .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:flex-end;justify-content:center}
